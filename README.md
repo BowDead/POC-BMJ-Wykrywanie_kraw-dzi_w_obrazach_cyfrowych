@@ -1,0 +1,1 @@
+# POC-BMJ-Wykrywanie_kraw-dzi_w_obrazach_cyfrowych
