@@ -30,10 +30,20 @@ def detect_edges_rgb(img):
     titles = ['Oryginał', 'Krawędzie R', 'Krawędzie G', 'Krawędzie B', 'Suma krawędzi']
     images = [img_rgb, edges_r, edges_g, edges_b, edges_sum]
 
-    plt.figure(figsize=(12, 8))
+    # Tworzymy figurę
+    fig = plt.figure(figsize=(16, 9))  # duży rozmiar, proporcje ekranu
+    manager = plt.get_current_fig_manager()
+
+    # Windows
+    try:
+        manager.window.state('zoomed')  # zmaksymalizowane okno
+    except:
+        # Linux/Mac - pełen ekran
+        manager.full_screen_toggle()
+
     for i, (im, title) in enumerate(zip(images, titles)):
         plt.subplot(2, 3, i+1)
-        plt.imshow(im if i == 0 else im, cmap=None if i == 0 else 'gray')
+        plt.imshow(im if im.ndim == 3 else im, cmap=None if im.ndim == 3 else 'gray')
         plt.title(title)
         plt.axis('off')
 

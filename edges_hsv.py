@@ -33,7 +33,17 @@ def detect_edges_hsv(img):
     titles = ['Oryginał (RGB)', 'Krawędzie H', 'Krawędzie S', 'Krawędzie V', 'Suma krawędzi']
     images = [img_rgb, edges_h, edges_s, edges_v, edges_sum]
 
-    plt.figure(figsize=(14, 8))
+    # Tworzymy figurę
+    fig = plt.figure(figsize=(16, 9))  # duży rozmiar, proporcje ekranu
+    manager = plt.get_current_fig_manager()
+
+    # Windows
+    try:
+        manager.window.state('zoomed')  # zmaksymalizowane okno
+    except:
+        # Linux/Mac - pełen ekran
+        manager.full_screen_toggle()
+
     for i, (im, title) in enumerate(zip(images, titles)):
         plt.subplot(2, 3, i+1)
         plt.imshow(im if im.ndim == 3 else im, cmap=None if im.ndim == 3 else 'gray')
