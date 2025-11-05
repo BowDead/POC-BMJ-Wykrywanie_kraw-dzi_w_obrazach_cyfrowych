@@ -9,146 +9,193 @@ from edges_detection import detect_edges
 
 APP_TITLE = "Edge Detection GUI"
 
-cv2_image = None
-tk_image = None
-preview_images = [None] * 5  # referencje do PhotoImage
+root = tk.Tk()
+root.title(APP_TITLE)
+root.geometry("1600x900")
 
-# ===== Funkcja wyboru obrazu =====
-def choose_image():
-    global cv2_image, tk_image
-    file_path = filedialog.askopenfilename(title="Wybierz obraz",
-                                           filetypes=[("Obrazy", "*.png;*.jpg;*.jpeg")])
-    if not file_path:
-        return
-
-    try:
-        img_pil = Image.open(file_path).convert("RGB")
-        original_w, original_h = img_pil.size
-
-        frame_size = 250
-        scale_ratio = frame_size / max(original_w, original_h)
-        new_w, new_h = int(original_w * scale_ratio), int(original_h * scale_ratio)
-        img_pil_resized = img_pil.resize((new_w, new_h), Image.LANCZOS)
-
-        cv2_image = cv2.cvtColor(np.array(img_pil), cv2.COLOR_RGB2BGR)
-        tk_image = ImageTk.PhotoImage(img_pil_resized)
-
-        display_image_in_canvas(img_pil_resized, 0)
-        status_label.config(text=f"Wczytano: {os.path.basename(file_path)}")
-
-    except Exception as e:
-        messagebox.showerror("Błąd", str(e))
+comparison_frames = []  # lista instancji modułów
 
 
-# ===== Pomocnicza funkcja do wyświetlania obrazu =====
-def display_image_in_canvas(pil_image, index):
-    global preview_images
-    frame_size = 250
-
+# ===== Pomocnicze funkcje =====
+def resize_for_canvas(pil_image, frame_size=200):
     w, h = pil_image.size
     scale_ratio = frame_size / max(w, h)
     new_w, new_h = int(w * scale_ratio), int(h * scale_ratio)
-    pil_resized = pil_image.resize((new_w, new_h), Image.LANCZOS)
-
-    img_tk = ImageTk.PhotoImage(pil_resized)
-    preview_images[index] = img_tk  # zapobiega garbage collection
-
-    canvas_list[index].delete("all")
-    x_offset = (frame_size - new_w) // 2
-    y_offset = (frame_size - new_h) // 2
-    canvas_list[index].create_image(x_offset, y_offset, anchor="nw", image=img_tk)
+    return pil_image.resize((new_w, new_h), Image.LANCZOS)
 
 
-# ===== Funkcja uruchomienia wykrywania =====
-def run_function():
-    if cv2_image is None:
-        messagebox.showwarning("Brak obrazu", "Najpierw wybierz obraz!")
+# ===== Klasa jednego modułu porównania =====
+class ComparisonFrame:
+    def __init__(self, parent):
+        self.cv2_image = None
+        self.tk_images = [None] * 5
+
+        # --- główny frame ---
+        self.frame = tk.Frame(parent, pady=10, padx=10, bd=2, relief="groove")
+        self.frame.pack(side="top", fill="x", padx=10, pady=5)
+
+        # --- pasek górny ---
+        top = tk.Frame(self.frame)
+        top.pack(fill="x", pady=5)
+
+        self.choose_button = tk.Button(top, text="Wybierz obraz", command=self.choose_image)
+        self.choose_button.pack(side="left", padx=5)
+
+        self.color_space_combo = ttk.Combobox(top, state="readonly", width=10)
+        self.color_space_combo['values'] = ['RGB', 'HSV', 'LAB']
+        self.color_space_combo.current(0)
+        self.color_space_combo.pack(side="left", padx=5)
+
+        self.method_combo = ttk.Combobox(top, state="readonly", width=10)
+        self.method_combo['values'] = ['Sobel', 'Laplacian', 'Scharr']
+        self.method_combo.current(0)
+        self.method_combo.pack(side="left", padx=5)
+
+        self.run_button = tk.Button(top, text="Uruchom funkcję", command=self.run_function)
+        self.run_button.pack(side="left", padx=5)
+
+        self.status_label = tk.Label(top, text="Nie wczytano obrazu", fg="gray")
+        self.status_label.pack(side="left", padx=10)
+
+        # --- obszar na obrazy ---
+        self.canvas_frame = tk.Frame(self.frame)
+        self.canvas_frame.pack(pady=10)
+
+        self.canvas_list = []
+        self.label_list = []
+
+        default_titles = ["Oryginał", "Kanał 1", "Kanał 2", "Kanał 3", "Suma"]
+
+        for i in range(5):
+            subframe = tk.Frame(self.canvas_frame)
+            subframe.pack(side="left", padx=10)
+
+            canvas = tk.Canvas(subframe, width=200, height=200, bg="#ddd")
+            canvas.pack()
+
+            label = tk.Label(subframe, text=default_titles[i])
+            label.pack()
+
+            self.canvas_list.append(canvas)
+            self.label_list.append(label)
+
+    # --- wybór obrazu ---
+    def choose_image(self):
+        file_path = filedialog.askopenfilename(title="Wybierz obraz",
+                                               filetypes=[("Obrazy", "*.png;*.jpg;*.jpeg")])
+        if not file_path:
+            return
+
+        try:
+            img_pil = Image.open(file_path).convert("RGB")
+            self.cv2_image = cv2.cvtColor(np.array(img_pil), cv2.COLOR_RGB2BGR)
+            resized = resize_for_canvas(img_pil)
+            self.display_image(resized, 0)
+            self.status_label.config(text=f"Wczytano: {os.path.basename(file_path)}")
+        except Exception as e:
+            messagebox.showerror("Błąd", str(e))
+
+    # --- wyświetlenie obrazu w kanwie ---
+    def display_image(self, pil_image, index):
+        frame_size = 200
+        pil_resized = resize_for_canvas(pil_image, frame_size)
+        img_tk = ImageTk.PhotoImage(pil_resized)
+        self.tk_images[index] = img_tk
+
+        canvas = self.canvas_list[index]
+        canvas.delete("all")
+        x_off = (frame_size - pil_resized.width) // 2
+        y_off = (frame_size - pil_resized.height) // 2
+        canvas.create_image(x_off, y_off, anchor="nw", image=img_tk)
+
+    # --- uruchomienie funkcji wykrywania ---
+    def run_function(self):
+        if self.cv2_image is None:
+            messagebox.showwarning("Brak obrazu", "Najpierw wybierz obraz!")
+            return
+
+        color_space = self.color_space_combo.get()
+        method = self.method_combo.get()
+
+        try:
+            img_rgb, edges, edges_sum, _ = detect_edges(self.cv2_image, color_space, method)
+
+            img_rgb_pil = Image.fromarray(img_rgb)
+            self.display_image(img_rgb_pil, 0)
+
+            color_labels = {
+                "RGB": ["R", "G", "B"],
+                "HSV": ["H", "S", "V"],
+                "LAB": ["L", "A", "B"]
+            }.get(color_space, ["Kanał 1", "Kanał 2", "Kanał 3"])
+
+            for i, e in enumerate(edges):
+                e_uint8 = (e * 255).astype(np.uint8) if e.max() <= 1 else e.astype(np.uint8)
+                edge_pil = Image.fromarray(e_uint8)
+                self.display_image(edge_pil, i + 1)
+                self.label_list[i + 1].config(text=f"Krawędź {color_labels[i]}")
+
+            e_sum_uint8 = (edges_sum * 255).astype(np.uint8) if edges_sum.max() <= 1 else edges_sum.astype(np.uint8)
+            sum_pil = Image.fromarray(e_sum_uint8)
+            self.display_image(sum_pil, len(edges) + 1)
+            self.label_list[len(edges) + 1].config(text="Suma krawędzi")
+            self.label_list[0].config(text="Oryginał")
+
+        except Exception as e:
+            messagebox.showerror("Błąd", str(e))
+
+
+# ===== Funkcje zarządzania modułami =====
+def add_comparison():
+    frame = ComparisonFrame(scrollable_frame)
+    comparison_frames.append(frame)
+    update_scroll_region()
+
+
+def remove_comparison():
+    if not comparison_frames:
         return
-
-    color_space = color_space_combo.get()
-    method = method_combo.get()
-
-    try:
-        img_rgb, edges, edges_sum, titles = detect_edges(cv2_image, color_space, method)
-
-        # Oryginał
-        img_rgb_pil = Image.fromarray(img_rgb)
-        display_image_in_canvas(img_rgb_pil, 0)
-
-        # Dynamiczne etykiety dla systemu barw
-        color_labels = {
-            "RGB": ["R", "G", "B"],
-            "HSV": ["H", "S", "V"],
-            "LAB": ["L", "A", "B"]
-        }.get(color_space, ["Kanał 1", "Kanał 2", "Kanał 3"])
-
-        # Krawędzie
-        for i, e in enumerate(edges):
-            e_uint8 = (e * 255).astype(np.uint8) if e.max() <= 1 else e.astype(np.uint8)
-            edge_pil = Image.fromarray(e_uint8)
-            display_image_in_canvas(edge_pil, i + 1)
-            label_list[i + 1].config(text=f"Krawędź {color_labels[i]}")
-
-        # Suma
-        e_sum_uint8 = (edges_sum * 255).astype(np.uint8) if edges_sum.max() <= 1 else edges_sum.astype(np.uint8)
-        sum_pil = Image.fromarray(e_sum_uint8)
-        display_image_in_canvas(sum_pil, len(edges) + 1)
-        label_list[len(edges) + 1].config(text="Suma krawędzi")
-
-        # Oryginał
-        label_list[0].config(text="Oryginał")
-
-    except Exception as e:
-        messagebox.showerror("Błąd", str(e))
+    last = comparison_frames.pop()
+    last.frame.destroy()
+    update_scroll_region()
 
 
-# ===== GUI =====
-root = tk.Tk()
-root.title(APP_TITLE)
-root.geometry("1600x600")
+def update_scroll_region(event=None):
+    canvas.configure(scrollregion=canvas.bbox("all"))
 
-frame_top = tk.Frame(root, pady=5)
-frame_top.pack(fill="x")
 
-choose_button = tk.Button(frame_top, text="Wybierz obraz", command=choose_image)
-choose_button.pack(side="left", padx=5)
+def on_mousewheel(event):
+    canvas.yview_scroll(int(-1 * (event.delta / 120)), "units")
 
-color_space_combo = ttk.Combobox(frame_top, state="readonly", width=10)
-color_space_combo['values'] = ['RGB', 'HSV', 'LAB']
-color_space_combo.current(0)
-color_space_combo.pack(side="left", padx=5)
 
-method_combo = ttk.Combobox(frame_top, state="readonly", width=10)
-method_combo['values'] = ['Sobel', 'Laplacian', 'Scharr']
-method_combo.current(0)
-method_combo.pack(side="left", padx=5)
+# ===== Główny pasek sterowania =====
+main_controls = tk.Frame(root, pady=10)
+main_controls.pack(fill="x")
 
-run_button = tk.Button(frame_top, text="Uruchom funkcję", command=run_function)
-run_button.pack(side="left", padx=5)
+tk.Button(main_controls, text="+", command=add_comparison, width=3).pack(side="left", padx=5)
+tk.Button(main_controls, text="-", command=remove_comparison, width=3).pack(side="left", padx=5)
 
-# ===== Obszary na obrazy =====
-canvas_frame = tk.Frame(root)
-canvas_frame.pack(pady=10)
+# ===== Przewijalna sekcja =====
+scroll_container = tk.Frame(root)
+scroll_container.pack(fill="both", expand=True)
 
-canvas_list = []
-label_list = []
+canvas = tk.Canvas(scroll_container)
+canvas.pack(side="left", fill="both", expand=True)
 
-default_titles = ["Oryginał", "Kanał 1", "Kanał 2", "Kanał 3", "Suma"]
+scrollbar = tk.Scrollbar(scroll_container, orient="vertical", command=canvas.yview)
+scrollbar.pack(side="right", fill="y")
 
-for i in range(5):
-    frame = tk.Frame(canvas_frame)
-    frame.pack(side="left", padx=10)
+canvas.configure(yscrollcommand=scrollbar.set)
 
-    canvas = tk.Canvas(frame, width=250, height=250, bg="#ddd")
-    canvas.pack()
+# frame wewnątrz canvasa
+scrollable_frame = tk.Frame(canvas)
+scrollable_frame.bind("<Configure>", update_scroll_region)
+canvas.create_window((0, 0), window=scrollable_frame, anchor="nw")
 
-    label = tk.Label(frame, text=default_titles[i])
-    label.pack()
+# obsługa przewijania myszką
+canvas.bind_all("<MouseWheel>", on_mousewheel)
 
-    canvas_list.append(canvas)
-    label_list.append(label)
-
-status_label = tk.Label(root, text="Nie wczytano obrazu", fg="gray")
-status_label.pack(pady=5)
+# start z jednym zestawem
+add_comparison()
 
 root.mainloop()
