@@ -67,7 +67,7 @@ class ComparisonFrame:
 
         for i in range(5):
             subframe = tk.Frame(self.canvas_frame)
-            subframe.pack(side="left", padx=10)
+            subframe.pack(side="left", padx=0)
 
             canvas = tk.Canvas(subframe, width=200, height=200, bg="#ddd")
             canvas.pack()
@@ -99,9 +99,10 @@ class ComparisonFrame:
 
         canvas = self.canvas_list[index]
         canvas.delete("all")
-        x_off = (frame_size - pil_resized.width) // 2
-        y_off = (frame_size - pil_resized.height) // 2
-        canvas.create_image(x_off, y_off, anchor="nw", image=img_tk)
+        canvas_width = int(canvas["width"])
+        canvas_height = int(canvas["height"])
+        canvas.create_image(canvas_width // 2 + 2, canvas_height // 2+2, anchor="center", image=img_tk)
+
 
     # --- zapisywanie obrazu ---
     def save_image(self, index):
