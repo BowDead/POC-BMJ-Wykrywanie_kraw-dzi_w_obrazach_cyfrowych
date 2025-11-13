@@ -29,6 +29,7 @@ class ComparisonFrame:
     def __init__(self, parent):
         self.cv2_image = None
         self.tk_images = [None] * 5
+        self.pil_images = [None] * 5  # zapamiętane obrazy PIL do zapisu
 
         # --- główny frame ---
         self.frame = tk.Frame(parent, pady=10, padx=10, bd=2, relief="groove")
@@ -47,7 +48,7 @@ class ComparisonFrame:
         self.color_space_combo.pack(side="left", padx=5)
 
         self.method_combo = ttk.Combobox(top, state="readonly", width=10)
-        self.method_combo['values'] = ['Sobel', 'Laplacian', 'Scharr','Sobel Old']
+        self.method_combo['values'] = ['Sobel', 'Laplacian', 'Scharr']
         self.method_combo.current(0)
         self.method_combo.pack(side="left", padx=5)
 
@@ -63,6 +64,7 @@ class ComparisonFrame:
 
         self.canvas_list = []
         self.label_list = []
+        self.save_buttons = []
 
         default_titles = ["Oryginał", "Kanał 1", "Kanał 2", "Kanał 3", "Suma"]
 
@@ -76,8 +78,12 @@ class ComparisonFrame:
             label = tk.Label(subframe, text=default_titles[i])
             label.pack()
 
+            save_btn = tk.Button(subframe, text="Zapisz", command=lambda idx=i: self.save_image(idx))
+            save_btn.pack(pady=3)
+
             self.canvas_list.append(canvas)
             self.label_list.append(label)
+            self.save_buttons.append(save_btn)
 
     # --- wybór obrazu ---
     def choose_image(self):
@@ -91,6 +97,7 @@ class ComparisonFrame:
             self.cv2_image = cv2.cvtColor(np.array(img_pil), cv2.COLOR_RGB2BGR)
             resized = resize_for_canvas(img_pil)
             self.display_image(resized, 0)
+            self.pil_images[0] = img_pil
             self.status_label.config(text=f"Wczytano: {os.path.basename(file_path)}")
         except Exception as e:
             messagebox.showerror("Błąd", str(e))
@@ -101,12 +108,34 @@ class ComparisonFrame:
         pil_resized = resize_for_canvas(pil_image, frame_size)
         img_tk = ImageTk.PhotoImage(pil_resized)
         self.tk_images[index] = img_tk
+        self.pil_images[index] = pil_image.copy()
 
         canvas = self.canvas_list[index]
         canvas.delete("all")
         x_off = (frame_size - pil_resized.width) // 2
         y_off = (frame_size - pil_resized.height) // 2
         canvas.create_image(x_off, y_off, anchor="nw", image=img_tk)
+
+    # --- zapisywanie obrazu ---
+    def save_image(self, index):
+        if self.pil_images[index] is None:
+            messagebox.showinfo("Brak obrazu", "Brak obrazu do zapisania.")
+            return
+
+        label_text = self.label_list[index].cget("text").replace(" ", "_")
+        file_path = filedialog.asksaveasfilename(
+            defaultextension=".png",
+            filetypes=[("PNG", "*.png")],
+            initialfile=f"{label_text}.png",
+            title="Zapisz obraz jako"
+        )
+
+        if file_path:
+            try:
+                self.pil_images[index].save(file_path)
+                messagebox.showinfo("Sukces", f"Zapisano: {os.path.basename(file_path)}")
+            except Exception as e:
+                messagebox.showerror("Błąd", f"Nie udało się zapisać obrazu:\n{e}")
 
     # --- uruchomienie funkcji wykrywania ---
     def run_function(self):
