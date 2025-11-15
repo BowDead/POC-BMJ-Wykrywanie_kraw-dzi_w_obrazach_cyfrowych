@@ -18,6 +18,16 @@ shared_image_cv2 = None  # wspólny obraz w formacie cv2
 shared_image_pil = None  # wspólny obraz w formacie PIL
 shared_image_path = None  # ścieżka do obrazu (dla etykiety)
 
+# ===== FOLDERY DOMYŚLNE =====
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+SAMPLES_DIR = os.path.join(BASE_DIR, "Przykładowe obrazy")
+OUTPUT_DIR = os.path.join(BASE_DIR, "Zapisane obrazy wynikowe")
+
+# Tworzymy foldery, jeśli ich nie ma
+os.makedirs(SAMPLES_DIR, exist_ok=True)
+os.makedirs(OUTPUT_DIR, exist_ok=True)
+
+
 
 # ===== Pomocnicze funkcje =====
 def resize_for_canvas(pil_image, frame_size=200):
@@ -115,6 +125,7 @@ class ComparisonFrame:
             defaultextension=".png",
             filetypes=[("PNG", "*.png")],
             initialfile=f"{label_text}.png",
+            initialdir=OUTPUT_DIR,
             title="Zapisz obraz jako"
         )
 
@@ -213,7 +224,8 @@ def choose_shared_image():
     global shared_image_cv2, shared_image_pil, shared_image_path
 
     file_path = filedialog.askopenfilename(title="Wybierz obraz",
-                                           filetypes=[("Obrazy", "*.png;*.jpg;*.jpeg")])
+                                           filetypes=[("Obrazy", "*.png;*.jpg;*.jpeg")],
+                                           initialdir=SAMPLES_DIR)
     if not file_path:
         return
 
