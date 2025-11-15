@@ -149,13 +149,20 @@ class ComparisonFrame:
             for i, e in enumerate(edges):
                 e_uint8 = (e * 255).astype(np.uint8) if e.max() <= 1 else e.astype(np.uint8)
                 e_uint8 = 255 - e_uint8
-                edge_pil = Image.fromarray(e_uint8)
+                # zamiana na czarno-biały (monochromatyczny)
+                _, binary = cv2.threshold(e_uint8, 254, 255, cv2.THRESH_BINARY)
+        
+                # wyświetlanie
+                edge_pil = Image.fromarray(binary)
                 self.display_image(edge_pil, i + 1)
                 self.label_list[i + 1].config(text=f"Krawędź {color_labels[i]}")
 
             e_sum_uint8 = (edges_sum * 255).astype(np.uint8) if edges_sum.max() <= 1 else edges_sum.astype(np.uint8)
             e_sum_uint8 = 255 - e_sum_uint8
-            sum_pil = Image.fromarray(e_sum_uint8)
+            _, binary = cv2.threshold(e_sum_uint8, 254, 255, cv2.THRESH_BINARY)
+        
+            # wyświetlanie
+            sum_pil = Image.fromarray(binary)
             self.display_image(sum_pil, len(edges) + 1)
             self.label_list[len(edges) + 1].config(text="Suma krawędzi")
             self.label_list[0].config(text="Oryginał")
