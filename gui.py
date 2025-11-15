@@ -43,6 +43,7 @@ class ComparisonFrame:
         self.cv2_image = None
         self.tk_images = [None] * 5
         self.pil_images = [None] * 5  # zapamiętane obrazy PIL do zapisu
+        
 
         # --- główny frame ---
         self.frame = tk.Frame(parent, pady=10, padx=10, bd=2, relief="groove")
@@ -119,12 +120,12 @@ class ComparisonFrame:
         if self.pil_images[index] is None:
             messagebox.showinfo("Brak obrazu", "Brak obrazu do zapisania.")
             return
-
-        label_text = self.label_list[index].cget("text").replace(" ", "_")
+        input_filename = os.path.splitext(os.path.basename(shared_image_path))[0];
+        label_text = self.label_list[index].cget("text").replace(" ", "_").lower()
         file_path = filedialog.asksaveasfilename(
             defaultextension=".png",
             filetypes=[("PNG", "*.png")],
-            initialfile=f"{label_text}.png",
+            initialfile=f"{input_filename}_{label_text}.png",
             initialdir=OUTPUT_DIR,
             title="Zapisz obraz jako"
         )
