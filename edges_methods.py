@@ -2,22 +2,24 @@ import cv2
 import numpy as np
 
 def fast_convolve2d(image, kernel):
+    """Performs a fast 2D convolution using numpy's stride tricks."""
     image = image.astype(np.float64)
     kernel = np.flipud(np.fliplr(kernel))
     kh, kw = kernel.shape
     pad_h, pad_w = kh // 2, kw // 2
     padded = np.pad(image, ((pad_h, pad_h), (pad_w, pad_w)), mode='reflect')
 
-    # generowanie przesuniętych okien
+    # generate shifted windows
     shape = (image.shape[0], image.shape[1], kh, kw)
     strides = padded.strides * 2
     windows = np.lib.stride_tricks.as_strided(padded, shape=shape, strides=strides)
 
-    # obliczenie konwolucji wektorowo
+    # calculate convolution vectorially
     return np.tensordot(windows, kernel, axes=((2, 3), (0, 1)))
 
 
 def sobel_edges_old(channel):
+    """Edge detection using cv2.Sobel (for comparison/legacy)."""
     ch = channel.astype(np.float64)
     grad_x = cv2.Sobel(ch, cv2.CV_64F, 1, 0, ksize=3)
     grad_y = cv2.Sobel(ch, cv2.CV_64F, 0, 1, ksize=3)
@@ -25,7 +27,7 @@ def sobel_edges_old(channel):
     return cv2.normalize(magnitude, None, 0, 255, cv2.NORM_MINMAX).astype(np.uint8)
 
 def sobel_edges(channel):
-    """Detekcja krawędzi filtrem Sobela bez użycia cv2.Sobel."""
+    """Edge detection using Sobel filter without cv2.Sobel."""
     sobel_x = np.array([[-1, 0, 1],
                         [-2, 0, 2],
                         [-1, 0, 1]], dtype=np.float64)
@@ -42,7 +44,7 @@ def sobel_edges(channel):
 
 
 def laplacian_edges(channel):
-    """Detekcja krawędzi filtrem Laplace’a bez użycia cv2.Laplacian."""
+    """Edge detection using Laplacian filter without cv2.Laplacian."""
     laplacian_kernel = np.array([[0,  1, 0],
                                  [1, -4, 1],
                                  [0,  1, 0]], dtype=np.float64)
@@ -52,7 +54,7 @@ def laplacian_edges(channel):
 
 
 def scharr_edges(channel):
-    """Detekcja krawędzi filtrem Scharra bez użycia cv2.Scharr."""
+    """Edge detection using Scharr filter without cv2.Scharr."""
     scharr_x = np.array([[-3, 0, 3],
                          [-10, 0, 10],
                          [-3, 0, 3]], dtype=np.float64)
@@ -68,7 +70,7 @@ def scharr_edges(channel):
     return cv2.normalize(magnitude, None, 0, 255, cv2.NORM_MINMAX).astype(np.uint8)
 
 def prewitt_edges(channel):
-    """Detekcja krawędzi filtrem Prewitta."""
+    """Edge detection using Prewitt filter."""
     prewitt_x = np.array([[-1, 0, 1],
                           [-1, 0, 1],
                           [-1, 0, 1]], dtype=np.float64)
