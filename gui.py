@@ -83,12 +83,27 @@ class ComparisonFrame:
         # Tworzymy tylko jedną kanwę – Oryginał
         self._create_canvas_block("Oryginał")
 
+        self.preview_window = None
+
     def _create_canvas_block(self, title):
         subframe = tk.Frame(self.canvas_frame)
         subframe.pack(side="left", padx=0)
 
         canvas = tk.Canvas(subframe, width=200, height=200, bg="#ddd")
         canvas.pack()
+
+        # Zmień kursor na pointer
+        subframe.config(cursor="hand2")
+
+        # Bind kliknięcia, przeciągania i puszczenia
+        subframe.bind("<ButtonPress-1>", lambda e, idx=len(self.canvas_list): self.show_preview(e, idx))
+        subframe.bind("<B1-Motion>", lambda e, idx=len(self.canvas_list): self.move_preview(e, idx))
+        subframe.bind("<ButtonRelease-1>", lambda e: self.hide_preview())
+
+        # Przekierowanie eventów z canvasa
+        canvas.bind("<ButtonPress-1>", lambda e: subframe.event_generate("<ButtonPress-1>"))
+        canvas.bind("<B1-Motion>", lambda e: subframe.event_generate("<B1-Motion>"))
+        canvas.bind("<ButtonRelease-1>", lambda e: subframe.event_generate("<ButtonRelease-1>"))
 
         label = tk.Label(subframe, text=title)
         label.pack()
@@ -103,6 +118,8 @@ class ComparisonFrame:
         self.canvas_list.append(canvas)
         self.label_list.append(label)
         self.save_buttons.append(save_btn)
+
+
 
     def clear_dynamic_canvases(self):
         # usuwa wszystko poza Oryginałem (index 0)
@@ -225,7 +242,49 @@ class ComparisonFrame:
         except Exception as e:
             messagebox.showerror("Błąd", str(e))
             self.status_label.config(text="Błąd", fg="red")
+        
+    def show_preview(self, event, index):
+        if index >= len(self.pil_images) or self.pil_images[index] is None:
+            return
 
+        self.hide_preview()
+
+        img = self.pil_images[index]
+
+        # Rozmiar powiększenia = 2x kanwa (canvas ma 200x200)
+        canvas = self.canvas_list[index]
+        zoom_w, zoom_h = int(canvas["width"])*2, int(canvas["height"])*2
+
+        zoomed = img.resize((zoom_w, zoom_h), Image.LANCZOS)
+        self.preview_img_tk = ImageTk.PhotoImage(zoomed)
+
+        # Tworzymy okno bez przypisanego rodzica
+        self.preview_window = tk.Toplevel()
+        self.preview_window.overrideredirect(True)
+        self.preview_window.attributes("-topmost", True)
+
+        label = tk.Label(self.preview_window, image=self.preview_img_tk, borderwidth=0)
+        label.pack()
+
+        # Wyznaczenie pozycji kanwy na ekranie
+        canvas_x = canvas.winfo_rootx()
+        canvas_y = canvas.winfo_rooty()
+        canvas_w = int(canvas["width"])
+        canvas_h = int(canvas["height"])
+
+        # Wyśrodkowanie powiększenia względem środka kanwy
+        center_x = canvas_x + canvas_w // 2 - zoom_w // 2
+        center_y = canvas_y + canvas_h // 2 - zoom_h // 2
+
+        self.preview_window.geometry(f"{zoom_w}x{zoom_h}+{center_x}+{center_y}")
+        self.preview_window.update_idletasks()
+
+
+    def hide_preview(self):
+        """Usuwa okno podglądu."""
+        if self.preview_window:
+            self.preview_window.destroy()
+            self.preview_window = None
 
 # ===== Funkcje zarządzania modułami =====
 def add_comparison():
