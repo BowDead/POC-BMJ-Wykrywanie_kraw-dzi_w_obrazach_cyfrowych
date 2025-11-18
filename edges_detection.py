@@ -1,6 +1,6 @@
 import cv2
 import numpy as np
-from edges_methods import sobel_edges, laplacian_edges, scharr_edges
+from edges_methods import sobel_edges, laplacian_edges, scharr_edges, prewitt_edges
 
 def detect_edges(img, color_space='RGB', method='Sobel'):
     """
@@ -10,7 +10,7 @@ def detect_edges(img, color_space='RGB', method='Sobel'):
     if img is None:
         raise ValueError("Nieprawidłowy obraz (None).")
 
-    methods_dict = {'Sobel': sobel_edges, 'Laplacian': laplacian_edges, 'Scharr': scharr_edges}
+    methods_dict = {'Sobel': sobel_edges, 'Laplacian': laplacian_edges, 'Scharr': scharr_edges, 'Prewitt': prewitt_edges}
     if method not in methods_dict:
         raise ValueError("Nieznana metoda wykrywania krawędzi.")
     edge_func = methods_dict[method]
