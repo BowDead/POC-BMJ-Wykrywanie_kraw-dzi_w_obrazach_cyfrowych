@@ -74,7 +74,7 @@ class ComparisonFrame:
 
         # --- obszar na obrazy ---
         self.canvas_frame = tk.Frame(self.frame)
-        self.canvas_frame.pack(pady=10)
+        self.canvas_frame.pack(pady=10, anchor="w", fill="x")
 
         self.canvas_list = []
         self.label_list = []
@@ -83,12 +83,27 @@ class ComparisonFrame:
         # Tworzymy tylko jedną kanwę – Oryginał
         self._create_canvas_block("Oryginał")
 
+        self.preview_window = None
+
     def _create_canvas_block(self, title):
         subframe = tk.Frame(self.canvas_frame)
-        subframe.pack(side="left", padx=0)
+        subframe.pack(side="left", padx=5, anchor="w")  # <-- dodaj anchor="w"
 
         canvas = tk.Canvas(subframe, width=200, height=200, bg="#ddd")
         canvas.pack()
+
+        # Zmień kursor na pointer
+        subframe.config(cursor="hand2")
+
+        # Bind kliknięcia, przeciągania i puszczenia
+        subframe.bind("<ButtonPress-1>", lambda e, idx=len(self.canvas_list): self.show_preview(e, idx))
+        subframe.bind("<B1-Motion>", lambda e, idx=len(self.canvas_list): self.move_preview(e, idx))
+        subframe.bind("<ButtonRelease-1>", lambda e: self.hide_preview())
+
+        # Przekierowanie eventów z canvasa
+        canvas.bind("<ButtonPress-1>", lambda e: subframe.event_generate("<ButtonPress-1>"))
+        canvas.bind("<B1-Motion>", lambda e: subframe.event_generate("<B1-Motion>"))
+        canvas.bind("<ButtonRelease-1>", lambda e: subframe.event_generate("<ButtonRelease-1>"))
 
         label = tk.Label(subframe, text=title)
         label.pack()
@@ -103,6 +118,8 @@ class ComparisonFrame:
         self.canvas_list.append(canvas)
         self.label_list.append(label)
         self.save_buttons.append(save_btn)
+
+
 
     def clear_dynamic_canvases(self):
         # usuwa wszystko poza Oryginałem (index 0)
@@ -225,7 +242,56 @@ class ComparisonFrame:
         except Exception as e:
             messagebox.showerror("Błąd", str(e))
             self.status_label.config(text="Błąd", fg="red")
+        
+    def show_preview(self, event, index):
+        if index >= len(self.pil_images) or self.pil_images[index] is None:
+            return
 
+        self.hide_preview()
+
+        img = self.pil_images[index]
+
+        # Rozmiar powiększenia = 2x kanwa (canvas ma 200x200)
+        canvas = self.canvas_list[index]
+        zoom_w, zoom_h = int(canvas["width"]) * 2, int(canvas["height"]) * 2
+
+        zoomed = img.resize((zoom_w, zoom_h), Image.LANCZOS)
+        self.preview_img_tk = ImageTk.PhotoImage(zoomed)
+
+        # Tworzymy okno bez przypisanego rodzica
+        self.preview_window = tk.Toplevel()
+        self.preview_window.overrideredirect(True)
+        self.preview_window.attributes("-topmost", True)
+
+        # ===== RAMKA DLA PODGLĄDU =====
+        # Zewnętrzna ramka – czarna
+        outer_frame = tk.Frame(self.preview_window, bg="black", bd=2)
+        outer_frame.pack(padx=2, pady=2)
+
+        # Wewnętrzna ramka – biała, z paddingiem aby utworzyć odstęp
+        inner_frame = tk.Frame(outer_frame, bg="white", bd=2)
+        inner_frame.pack(padx=2, pady=2)
+
+        # Label z obrazkiem, z odstępem wewnątrz białej ramki
+        label = tk.Label(inner_frame, image=self.preview_img_tk, borderwidth=0, bg="white")
+        label.pack()
+
+        # ===== WYŚRODKOWANIE NA EKRANIE =====
+        screen_w = self.preview_window.winfo_screenwidth()
+        screen_h = self.preview_window.winfo_screenheight()
+
+        center_x = (screen_w - zoom_w) // 2
+        center_y = (screen_h - zoom_h) // 2
+
+        self.preview_window.geometry(f"{zoom_w + 8}x{zoom_h + 8}+{center_x}+{center_y}")  # uwzględniamy border
+        self.preview_window.update_idletasks()
+
+
+    def hide_preview(self):
+        """Usuwa okno podglądu."""
+        if self.preview_window:
+            self.preview_window.destroy()
+            self.preview_window = None
 
 # ===== Funkcje zarządzania modułami =====
 def add_comparison():
