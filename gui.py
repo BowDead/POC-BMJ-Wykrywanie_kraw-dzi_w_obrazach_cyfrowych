@@ -74,7 +74,7 @@ class ComparisonFrame:
 
         # --- obszar na obrazy ---
         self.canvas_frame = tk.Frame(self.frame)
-        self.canvas_frame.pack(pady=10)
+        self.canvas_frame.pack(pady=10, anchor="w", fill="x")
 
         self.canvas_list = []
         self.label_list = []
@@ -87,7 +87,7 @@ class ComparisonFrame:
 
     def _create_canvas_block(self, title):
         subframe = tk.Frame(self.canvas_frame)
-        subframe.pack(side="left", padx=0)
+        subframe.pack(side="left", padx=5, anchor="w")  # <-- dodaj anchor="w"
 
         canvas = tk.Canvas(subframe, width=200, height=200, bg="#ddd")
         canvas.pack()
@@ -253,7 +253,7 @@ class ComparisonFrame:
 
         # Rozmiar powiększenia = 2x kanwa (canvas ma 200x200)
         canvas = self.canvas_list[index]
-        zoom_w, zoom_h = int(canvas["width"])*2, int(canvas["height"])*2
+        zoom_w, zoom_h = int(canvas["width"]) * 2, int(canvas["height"]) * 2
 
         zoomed = img.resize((zoom_w, zoom_h), Image.LANCZOS)
         self.preview_img_tk = ImageTk.PhotoImage(zoomed)
@@ -263,20 +263,27 @@ class ComparisonFrame:
         self.preview_window.overrideredirect(True)
         self.preview_window.attributes("-topmost", True)
 
-        label = tk.Label(self.preview_window, image=self.preview_img_tk, borderwidth=0)
+        # ===== RAMKA DLA PODGLĄDU =====
+        # Zewnętrzna ramka – czarna
+        outer_frame = tk.Frame(self.preview_window, bg="black", bd=2)
+        outer_frame.pack(padx=2, pady=2)
+
+        # Wewnętrzna ramka – biała, z paddingiem aby utworzyć odstęp
+        inner_frame = tk.Frame(outer_frame, bg="white", bd=2)
+        inner_frame.pack(padx=2, pady=2)
+
+        # Label z obrazkiem, z odstępem wewnątrz białej ramki
+        label = tk.Label(inner_frame, image=self.preview_img_tk, borderwidth=0, bg="white")
         label.pack()
 
-        # Wyznaczenie pozycji kanwy na ekranie
-        canvas_x = canvas.winfo_rootx()
-        canvas_y = canvas.winfo_rooty()
-        canvas_w = int(canvas["width"])
-        canvas_h = int(canvas["height"])
+        # ===== WYŚRODKOWANIE NA EKRANIE =====
+        screen_w = self.preview_window.winfo_screenwidth()
+        screen_h = self.preview_window.winfo_screenheight()
 
-        # Wyśrodkowanie powiększenia względem środka kanwy
-        center_x = canvas_x + canvas_w // 2 - zoom_w // 2
-        center_y = canvas_y + canvas_h // 2 - zoom_h // 2
+        center_x = (screen_w - zoom_w) // 2
+        center_y = (screen_h - zoom_h) // 2
 
-        self.preview_window.geometry(f"{zoom_w}x{zoom_h}+{center_x}+{center_y}")
+        self.preview_window.geometry(f"{zoom_w + 8}x{zoom_h + 8}+{center_x}+{center_y}")  # uwzględniamy border
         self.preview_window.update_idletasks()
 
 
