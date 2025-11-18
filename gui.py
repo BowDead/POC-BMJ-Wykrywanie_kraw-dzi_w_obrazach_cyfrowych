@@ -18,7 +18,7 @@ current_language = 'pl'
 TRANSLATIONS = {
     'pl': {
         # Tytuł aplikacji
-        'APP_TITLE': "Detekcja Krawędzi GUI",
+        'APP_TITLE': "Edge Detection GUI",
         # Teksty główne
         'ADD_FRAME': "+",
         'REMOVE_FRAME': "-",
