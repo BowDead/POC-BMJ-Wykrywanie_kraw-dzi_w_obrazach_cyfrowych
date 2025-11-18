@@ -1,6 +1,6 @@
 import cv2
 import numpy as np
-from edges_methods import sobel_edges, laplacian_edges, scharr_edges
+from edges_methods import sobel_edges, laplacian_edges, scharr_edges, prewitt_edges
 
 def detect_edges(img, color_space='RGB', method='Sobel'):
     """
@@ -10,7 +10,7 @@ def detect_edges(img, color_space='RGB', method='Sobel'):
     if img is None:
         raise ValueError("Nieprawidłowy obraz (None).")
 
-    methods_dict = {'Sobel': sobel_edges, 'Laplacian': laplacian_edges, 'Scharr': scharr_edges}
+    methods_dict = {'Sobel': sobel_edges, 'Laplacian': laplacian_edges, 'Scharr': scharr_edges, 'Prewitt': prewitt_edges}
     if method not in methods_dict:
         raise ValueError("Nieznana metoda wykrywania krawędzi.")
     edge_func = methods_dict[method]
@@ -52,6 +52,47 @@ def detect_edges(img, color_space='RGB', method='Sobel'):
         
         edges = [edges_l, edges_a, edges_b]
         titles = ['L', 'A', 'B', 'Suma krawędzi']
+
+    elif color_space == 'CMYK':
+        # Konwersja RGB -> CMYK (własnoręczna, bez PIL)
+        rgb = img_rgb.astype(np.float32) / 255.0
+        r, g, b = cv2.split(rgb)
+
+        # Obliczenie kanałów CMY
+        c = 1 - r
+        m = 1 - g
+        y = 1 - b
+
+        # Kanał K = minimum z CMY
+        k = np.minimum(np.minimum(c, m), y)
+
+        # Unikamy dzielenia przez zero
+        denom = 1 - k
+        denom[denom == 0] = 1
+
+        # Obliczenie właściwych C, M, Y (drukarskich)
+        c_final = (c - k) / denom
+        m_final = (m - k) / denom
+        y_final = (y - k) / denom
+
+        # Normalizacja 0–255 uint8
+        C = (c_final * 255).astype(np.uint8)
+        M = (m_final * 255).astype(np.uint8)
+        Y = (y_final * 255).astype(np.uint8)
+        K = (k * 255).astype(np.uint8)
+
+        # Wykrywanie krawędzi
+        edges_C = edge_func(C)
+        edges_M = edge_func(M)
+        edges_Y = edge_func(Y)
+        edges_K = edge_func(K)
+
+        edges = [edges_C, edges_M, edges_Y, edges_K]
+
+        # Suma: maksymalna odpowiedź z kanałów
+        edges_sum = np.max(np.stack(edges, axis=0), axis=0)
+
+        titles = ['C', 'M', 'Y', 'K', 'Suma krawędzi']
 
     else:
         raise ValueError("Nieznany system kolorów.")

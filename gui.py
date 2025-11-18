@@ -13,6 +13,8 @@ root = tk.Tk()
 root.title(APP_TITLE)
 root.geometry("1600x900")
 
+root.state("zoomed")
+
 comparison_frames = []  # lista instancji modułów
 shared_image_cv2 = None  # wspólny obraz w formacie cv2
 shared_image_pil = None  # wspólny obraz w formacie PIL
@@ -41,8 +43,8 @@ def resize_for_canvas(pil_image, frame_size=200):
 class ComparisonFrame:
     def __init__(self, parent):
         self.cv2_image = None
-        self.tk_images = [None] * 5
-        self.pil_images = [None] * 5  # zapamiętane obrazy PIL do zapisu
+        self.tk_images = []
+        self.pil_images = []
         
 
         # --- główny frame ---
@@ -54,17 +56,21 @@ class ComparisonFrame:
         top.pack(fill="x", pady=5)
 
         self.color_space_combo = ttk.Combobox(top, state="readonly", width=10)
-        self.color_space_combo['values'] = ['RGB', 'HSV', 'LAB']
+        self.color_space_combo['values'] = ['RGB', 'HSV', 'LAB', 'CMYK']
         self.color_space_combo.current(0)
         self.color_space_combo.pack(side="left", padx=5)
 
         self.method_combo = ttk.Combobox(top, state="readonly", width=10)
-        self.method_combo['values'] = ['Sobel', 'Laplacian', 'Scharr']
+        self.method_combo['values'] = ['Sobel', 'Laplacian', 'Scharr', 'Prewitt']
         self.method_combo.current(0)
         self.method_combo.pack(side="left", padx=5)
 
         self.status_label = tk.Label(top, text="Brak obrazu", fg="gray")
         self.status_label.pack(side="left", padx=10)
+
+        self.binary_var = tk.BooleanVar(value=False)
+        self.binary_check = tk.Checkbutton(top, text="Binaryzacja", variable=self.binary_var)
+        self.binary_check.pack(side="left", padx=10)
 
         # --- obszar na obrazy ---
         self.canvas_frame = tk.Frame(self.frame)
@@ -74,24 +80,38 @@ class ComparisonFrame:
         self.label_list = []
         self.save_buttons = []
 
-        default_titles = ["Oryginał", "Kanał 1", "Kanał 2", "Kanał 3", "Suma"]
+        # Tworzymy tylko jedną kanwę – Oryginał
+        self._create_canvas_block("Oryginał")
 
-        for i in range(5):
-            subframe = tk.Frame(self.canvas_frame)
-            subframe.pack(side="left", padx=0)
+    def _create_canvas_block(self, title):
+        subframe = tk.Frame(self.canvas_frame)
+        subframe.pack(side="left", padx=0)
 
-            canvas = tk.Canvas(subframe, width=200, height=200, bg="#ddd")
-            canvas.pack()
+        canvas = tk.Canvas(subframe, width=200, height=200, bg="#ddd")
+        canvas.pack()
 
-            label = tk.Label(subframe, text=default_titles[i])
-            label.pack()
+        label = tk.Label(subframe, text=title)
+        label.pack()
 
-            save_btn = tk.Button(subframe, text="Zapisz", command=lambda idx=i: self.save_image(idx))
-            save_btn.pack(pady=3)
+        save_btn = tk.Button(
+            subframe,
+            text="Zapisz",
+            command=lambda idx=len(self.canvas_list): self.save_image(idx)
+        )
+        save_btn.pack(pady=3)
 
-            self.canvas_list.append(canvas)
-            self.label_list.append(label)
-            self.save_buttons.append(save_btn)
+        self.canvas_list.append(canvas)
+        self.label_list.append(label)
+        self.save_buttons.append(save_btn)
+
+    def clear_dynamic_canvases(self):
+        # usuwa wszystko poza Oryginałem (index 0)
+        for canvas, label, btn in zip(self.canvas_list[1:], self.label_list[1:], self.save_buttons[1:]):
+            canvas.master.destroy()
+
+        self.canvas_list = self.canvas_list[:1]
+        self.label_list = self.label_list[:1]
+        self.save_buttons = self.save_buttons[:1]
 
     # --- ustawienie obrazu współdzielonego ---
     def set_shared_image(self, pil_img, cv2_img, file_path):
@@ -105,6 +125,12 @@ class ComparisonFrame:
         frame_size = 200
         pil_resized = resize_for_canvas(pil_image, frame_size)
         img_tk = ImageTk.PhotoImage(pil_resized)
+        # Dopasuj długość list
+        while len(self.tk_images) <= index:
+            self.tk_images.append(None)
+        while len(self.pil_images) <= index:
+            self.pil_images.append(None)
+
         self.tk_images[index] = img_tk
         self.pil_images[index] = pil_image.copy()
 
@@ -117,7 +143,7 @@ class ComparisonFrame:
 
     # --- zapisywanie obrazu ---
     def save_image(self, index):
-        if self.pil_images[index] is None:
+        if index >= len(self.pil_images) or self.pil_images[index] is None:
             messagebox.showinfo("Brak obrazu", "Brak obrazu do zapisania.")
             return
         input_filename = os.path.splitext(os.path.basename(shared_image_path))[0];
@@ -139,6 +165,9 @@ class ComparisonFrame:
 
     # --- uruchomienie funkcji wykrywania ---
     def run_function(self):
+        # usuń stare canvas zanim wstawimy nowe
+        self.clear_dynamic_canvases()
+
         if self.cv2_image is None:
             self.status_label.config(text="Brak obrazu", fg="red")
             return
@@ -155,28 +184,40 @@ class ComparisonFrame:
             color_labels = {
                 "RGB": ["R", "G", "B"],
                 "HSV": ["H", "S", "V"],
-                "LAB": ["L", "A", "B"]
-            }.get(color_space, ["Kanał 1", "Kanał 2", "Kanał 3"])
+                "LAB": ["L", "A", "B"],
+                "CMYK": ["C", "M", "Y", "K"]
+            }.get(color_space, [f"Kanał {i+1}" for i in range(len(edges))])
 
+            # Najpierw twórz dynamiczne canvas
+            for i in range(len(edges)):
+                self._create_canvas_block(f"Krawędź {color_labels[i]}")
+
+            # teraz uzupełnij obrazami
             for i, e in enumerate(edges):
                 e_uint8 = (e * 255).astype(np.uint8) if e.max() <= 1 else e.astype(np.uint8)
                 e_uint8 = 255 - e_uint8
-                # zamiana na czarno-biały (monochromatyczny)
-                _, binary = cv2.threshold(e_uint8, 254, 255, cv2.THRESH_BINARY)
-        
-                # wyświetlanie
-                edge_pil = Image.fromarray(binary)
+
+                if self.binary_var.get():
+                    _, processed = cv2.threshold(e_uint8, 254, 255, cv2.THRESH_BINARY)
+                else:
+                    processed = e_uint8
+
+                edge_pil = Image.fromarray(processed)
                 self.display_image(edge_pil, i + 1)
-                self.label_list[i + 1].config(text=f"Krawędź {color_labels[i]}")
 
             e_sum_uint8 = (edges_sum * 255).astype(np.uint8) if edges_sum.max() <= 1 else edges_sum.astype(np.uint8)
             e_sum_uint8 = 255 - e_sum_uint8
-            _, binary = cv2.threshold(e_sum_uint8, 254, 255, cv2.THRESH_BINARY)
-        
-            # wyświetlanie
-            sum_pil = Image.fromarray(binary)
-            self.display_image(sum_pil, len(edges) + 1)
-            self.label_list[len(edges) + 1].config(text="Suma krawędzi")
+
+            if self.binary_var.get():
+                _, processed = cv2.threshold(e_sum_uint8, 254, 255, cv2.THRESH_BINARY)
+            else:
+                processed = e_sum_uint8
+
+            sum_pil = Image.fromarray(processed)
+
+             # Canvas dla sumy
+            self._create_canvas_block("Suma krawędzi")
+            self.display_image(sum_pil, len(self.canvas_list) - 1)
             self.label_list[0].config(text="Oryginał")
 
             self.status_label.config(text="Gotowe", fg="green")
