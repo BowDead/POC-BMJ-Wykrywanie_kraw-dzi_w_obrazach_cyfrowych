@@ -66,3 +66,19 @@ def scharr_edges(channel):
     magnitude = np.hypot(grad_x, grad_y)
 
     return cv2.normalize(magnitude, None, 0, 255, cv2.NORM_MINMAX).astype(np.uint8)
+
+def prewitt_edges(channel):
+    """Detekcja krawędzi filtrem Prewitta."""
+    prewitt_x = np.array([[-1, 0, 1],
+                          [-1, 0, 1],
+                          [-1, 0, 1]], dtype=np.float64)
+
+    prewitt_y = np.array([[1, 1, 1],
+                          [0, 0, 0],
+                          [-1, -1, -1]], dtype=np.float64)
+
+    grad_x = fast_convolve2d(channel, prewitt_x)
+    grad_y = fast_convolve2d(channel, prewitt_y)
+    magnitude = np.hypot(grad_x, grad_y)
+
+    return cv2.normalize(magnitude, None, 0, 255, cv2.NORM_MINMAX).astype(np.uint8)
