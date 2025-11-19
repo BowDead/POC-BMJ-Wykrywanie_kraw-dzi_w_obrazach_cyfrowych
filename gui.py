@@ -7,10 +7,6 @@ from PIL import Image, ImageTk
 
 from edges_detection import detect_edges
 
-# ==============================================================================
-# 🌎 Obsługa języków
-# ==============================================================================
-
 # Aktualny język ('pl' lub 'en')
 current_language = 'pl'
 
@@ -152,7 +148,7 @@ class ComparisonFrame:
         self.color_space_combo.pack(side="left", padx=5)
 
         self.method_combo = ttk.Combobox(top, state="readonly", width=10)
-        self.method_combo['values'] = ['Sobel', 'Laplacian', 'Scharr', 'Prewitt']
+        self.method_combo['values'] = ['Sobel', 'Laplacian', 'Scharr', 'Prewitt', 'Canny']
         self.method_combo.current(0)
         self.method_combo.pack(side="left", padx=5)
 

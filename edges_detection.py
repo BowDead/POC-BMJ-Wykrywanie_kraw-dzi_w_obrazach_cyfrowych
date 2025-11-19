@@ -1,6 +1,6 @@
 import cv2
 import numpy as np
-from edges_methods import sobel_edges, laplacian_edges, scharr_edges, prewitt_edges
+from edges_methods import sobel_edges, laplacian_edges, scharr_edges, prewitt_edges, canny_edges
 
 def detect_edges(img, color_space='RGB', method='Sobel',
                  translations_getter=None, low_threshold=0, high_threshold=255):
@@ -17,7 +17,8 @@ def detect_edges(img, color_space='RGB', method='Sobel',
         'Sobel': sobel_edges,
         'Laplacian': laplacian_edges,
         'Scharr': scharr_edges,
-        'Prewitt': prewitt_edges
+        'Prewitt': prewitt_edges,
+        'Canny': canny_edges
     }
 
     if method not in methods_dict:
@@ -36,10 +37,13 @@ def detect_edges(img, color_space='RGB', method='Sobel',
         edges_B = edge_func(B, low_threshold, high_threshold)
 
         edges = [edges_R, edges_G, edges_B]
-        edges_sum = cv2.addWeighted(
-            cv2.addWeighted(edges_R, 1/3, edges_G, 1/3, 0),
-            1, edges_B, 1/3, 0
-        )
+        if method == 'Canny':
+            edges_sum = np.maximum.reduce(edges)
+        else:
+            edges_sum = cv2.addWeighted(
+                cv2.addWeighted(edges_R, 1/3, edges_G, 1/3, 0),
+                1, edges_B, 1/3, 0
+            )
 
         titles = [
             get_text('CHANNEL_R'),
@@ -60,7 +64,10 @@ def detect_edges(img, color_space='RGB', method='Sobel',
         edges_V = edge_func(V, low_threshold, high_threshold)
 
         edges = [edges_H, edges_S, edges_V]
-        edges_sum = np.maximum(np.maximum(edges_H, edges_S), edges_V)
+        if method == 'Canny':
+            edges_sum = np.maximum.reduce(edges)
+        else:
+            edges_sum = np.maximum(np.maximum(edges_H, edges_S), edges_V)
 
         titles = [
             get_text('CHANNEL_H'),
@@ -83,12 +90,15 @@ def detect_edges(img, color_space='RGB', method='Sobel',
         edges = [edges_L, edges_A, edges_B]
 
         # suma wektorowa
-        edges_sum = np.sqrt(
-            edges_L.astype(np.float64)**2 +
-            edges_A.astype(np.float64)**2 +
-            edges_B.astype(np.float64)**2
-        )
-        edges_sum = cv2.normalize(edges_sum, None, 0, 255, cv2.NORM_MINMAX).astype(np.uint8)
+        if method == 'Canny':
+            edges_sum = np.maximum.reduce(edges)
+        else:
+            edges_sum = np.sqrt(
+                edges_L.astype(np.float64)**2 +
+                edges_A.astype(np.float64)**2 +
+                edges_B.astype(np.float64)**2
+            )
+            edges_sum = cv2.normalize(edges_sum, None, 0, 255, cv2.NORM_MINMAX).astype(np.uint8)
 
         titles = [
             get_text('CHANNEL_L'),
@@ -129,8 +139,10 @@ def detect_edges(img, color_space='RGB', method='Sobel',
 
         edges = [edges_C, edges_M, edges_Y, edges_K]
 
-        edges_sum = np.max(np.stack(edges, axis=0), axis=0)
-
+        if method == 'Canny':
+            edges_sum = np.maximum.reduce(edges)
+        else:
+            edges_sum = np.max(np.stack(edges, axis=0), axis=0)
         titles = [
             get_text('CHANNEL_C'),
             get_text('CHANNEL_M'),
