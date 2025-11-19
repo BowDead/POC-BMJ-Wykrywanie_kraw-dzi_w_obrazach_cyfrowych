@@ -91,3 +91,21 @@ def canny_edges(channel, low_t=50, high_t=150):
     ch = channel.astype(np.uint8)
     edges = cv2.Canny(ch, low_t, high_t)
     return edges
+
+def roberts_edges(channel, low_t=0, high_t=255):
+    """Edge detection using Roberts cross operator (2x2) without cv2."""
+    # Roberts cross kernels (2x2)
+    roberts_x = np.array([[1, 0],
+                          [0, -1]], dtype=np.float64)
+    roberts_y = np.array([[0, 1],
+                          [-1, 0]], dtype=np.float64)
+
+    # ensure float for convolution
+    grad_x = fast_convolve2d(channel, roberts_x)
+    grad_y = fast_convolve2d(channel, roberts_y)
+
+    magnitude = np.hypot(grad_x, grad_y)
+    magnitude = np.clip(magnitude, low_t, high_t)
+
+    # normalize to 0-255 uint8 like other functions
+    return cv2.normalize(magnitude, None, 0, 255, cv2.NORM_MINMAX).astype(np.uint8)

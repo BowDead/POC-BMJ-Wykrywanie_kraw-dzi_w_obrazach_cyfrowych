@@ -1,6 +1,6 @@
 import cv2
 import numpy as np
-from edges_methods import sobel_edges, laplacian_edges, scharr_edges, prewitt_edges, canny_edges
+from edges_methods import sobel_edges, laplacian_edges, scharr_edges, prewitt_edges, canny_edges, roberts_edges
 
 def detect_edges(img, color_space='RGB', method='Sobel',
                  translations_getter=None, low_threshold=0, high_threshold=255):
@@ -18,7 +18,8 @@ def detect_edges(img, color_space='RGB', method='Sobel',
         'Laplacian': laplacian_edges,
         'Scharr': scharr_edges,
         'Prewitt': prewitt_edges,
-        'Canny': canny_edges
+        'Canny': canny_edges,
+        'Roberts': roberts_edges
     }
 
     if method not in methods_dict:
