@@ -361,7 +361,6 @@ class ComparisonFrame:
             messagebox.showerror(get_text("UNKNOWN_ERROR"), str(e)) # Zmiana
             self.status_label.config(text=get_text("STATUS_ERROR"), fg="red") # Zmiana
 
-    # Usunięto move_preview, bo nie było jej w oryginalnym kodzie
     def show_preview(self, event, index):
         if index >= len(self.pil_images) or self.pil_images[index] is None:
             return
@@ -371,7 +370,11 @@ class ComparisonFrame:
         img = self.pil_images[index]
 
         canvas = self.canvas_list[index]
-        zoom_w, zoom_h = int(canvas["width"]) * 2, int(canvas["height"]) * 2
+        zoom_w, zoom_h = int(canvas["width"]) * 3, int(canvas["height"]) * 3
+
+        # Zmiana: zmniejszamy obraz o kilka px aby uniknąć ucięcia
+        zoom_w -= 10
+        zoom_h -= 10
 
         zoomed = img.resize((zoom_w, zoom_h), Image.LANCZOS)
         self.preview_img_tk = ImageTk.PhotoImage(zoomed)
@@ -389,13 +392,17 @@ class ComparisonFrame:
         label = tk.Label(inner_frame, image=self.preview_img_tk, borderwidth=0, bg="white")
         label.pack()
 
+        # Zmiana: uwzględnienie marginesów (8 px → 20 px)
+        window_w = zoom_w + 20
+        window_h = zoom_h + 20
+
         screen_w = self.preview_window.winfo_screenwidth()
         screen_h = self.preview_window.winfo_screenheight()
 
-        center_x = (screen_w - zoom_w) // 2
-        center_y = (screen_h - zoom_h) // 2
+        center_x = (screen_w - window_w) // 2
+        center_y = (screen_h - window_h) // 2
 
-        self.preview_window.geometry(f"{zoom_w + 8}x{zoom_h + 8}+{center_x}+{center_y}")
+        self.preview_window.geometry(f"{window_w}x{window_h}+{center_x}+{center_y}")
         self.preview_window.update_idletasks()
 
 
