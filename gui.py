@@ -156,25 +156,12 @@ class ComparisonFrame:
         self.method_combo.current(0)
         self.method_combo.pack(side="left", padx=5)
 
-        # --- spinboxy progów filtrów ---
-        self.low_threshold = tk.IntVar(value=0)
-        self.high_threshold = tk.IntVar(value=255)
-
-        tk.Label(top, text="Low T:").pack(side="left", padx=3)
-        self.low_spin = tk.Spinbox(top, from_=0, to=255, width=5, textvariable=self.low_threshold)
-        self.low_spin.pack(side="left", padx=3)
-
-        tk.Label(top, text="High T:").pack(side="left", padx=3)
-        self.high_spin = tk.Spinbox(top, from_=1, to=255, width=5, textvariable=self.high_threshold)
-        self.high_spin.pack(side="left", padx=3)
-
         self.status_label = tk.Label(top, text=get_text('STATUS_NO_IMAGE'), fg="gray") # Zmiana
         self.status_label.pack(side="left", padx=10)
 
         self.binary_var = tk.BooleanVar(value=False)
         self.binary_check = tk.Checkbutton(top, text=get_text('BINARYZATION'), variable=self.binary_var) # Zmiana
         self.binary_check.pack(side="left", padx=10)
-        
 
         # --- obszar na obrazy ---
         self.canvas_frame = tk.Frame(self.frame)
@@ -325,19 +312,9 @@ class ComparisonFrame:
         color_space = self.color_space_combo.get()
         method = self.method_combo.get()
 
-        low_t = int(self.low_threshold.get())
-        high_t = int(self.high_threshold.get())
-
         try:
             # Zmiana: przekazujemy funkcję get_text
-            img_rgb, edges, edges_sum, titles = detect_edges(
-                self.cv2_image,
-                color_space,
-                method,
-                translations_getter=get_text,
-                low_threshold=low_t,
-                high_threshold=high_t
-            )
+            img_rgb, edges, edges_sum, titles = detect_edges(self.cv2_image, color_space, method, translations_getter=get_text)
 
             img_rgb_pil = Image.fromarray(img_rgb)
             self.display_image(img_rgb_pil, 0)
