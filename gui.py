@@ -197,9 +197,6 @@ class ComparisonFrame:
 
         # Bind kliknięcia, przeciągania i puszczenia
         subframe.bind("<ButtonPress-1>", lambda e, idx=len(self.canvas_list): self.show_preview(e, idx))
-        # Usunąłem move_preview, bo nie jest zdefiniowana w obecnym kodzie,
-        # ale zostawiam bindy na canvas, aby umożliwić podgląd kliknięciem.
-        # Jeśli move_preview było w starszej wersji, należy ją przywrócić.
         subframe.bind("<ButtonRelease-1>", lambda e: self.hide_preview())
 
         # Przekierowanie eventów z canvasa
