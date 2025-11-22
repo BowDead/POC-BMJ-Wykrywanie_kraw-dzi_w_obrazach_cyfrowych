@@ -87,7 +87,7 @@ def prewitt_edges(channel, low_t=0, high_t=255):
     magnitude = np.clip(magnitude, low_t, high_t)
     return cv2.normalize(magnitude, None, 0, 255, cv2.NORM_MINMAX).astype(np.uint8)
 
-def canny_edges(channel, low_t=50, high_t=150):
+def canny_cv2_edges(channel, low_t=50, high_t=150):
     ch = channel.astype(np.uint8)
     edges = cv2.Canny(ch, low_t, high_t)
     return edges
