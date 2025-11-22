@@ -1,6 +1,6 @@
 import cv2
 import numpy as np
-from edges_methods import sobel_edges, laplacian_edges, scharr_edges, prewitt_edges, canny_cv2_edges, roberts_edges
+from edges_methods import sobel_edges, laplacian_edges, scharr_edges, prewitt_edges, canny_edges, canny_cv2_edges, roberts_edges
 
 def detect_edges(img, color_space='RGB', method='Sobel',
                  translations_getter=None, low_threshold=0, high_threshold=255):
@@ -18,6 +18,7 @@ def detect_edges(img, color_space='RGB', method='Sobel',
         'Laplacian': laplacian_edges,
         'Scharr': scharr_edges,
         'Prewitt': prewitt_edges,
+        'Canny': canny_edges,
         'Canny CV2': canny_cv2_edges,
         'Roberts': roberts_edges
     }
@@ -38,7 +39,7 @@ def detect_edges(img, color_space='RGB', method='Sobel',
         edges_B = edge_func(B, low_threshold, high_threshold)
 
         edges = [edges_R, edges_G, edges_B]
-        if method == 'Canny CV2':
+        if method == 'Canny CV2' or 'Canny':
             edges_sum = np.maximum.reduce(edges)
         else:
             edges_sum = cv2.addWeighted(
@@ -65,7 +66,7 @@ def detect_edges(img, color_space='RGB', method='Sobel',
         edges_V = edge_func(V, low_threshold, high_threshold)
 
         edges = [edges_H, edges_S, edges_V]
-        if method == 'Canny CV2':
+        if method == 'Canny CV2' or 'Canny':
             edges_sum = np.maximum.reduce(edges)
         else:
             edges_sum = np.maximum(np.maximum(edges_H, edges_S), edges_V)
@@ -91,7 +92,7 @@ def detect_edges(img, color_space='RGB', method='Sobel',
         edges = [edges_L, edges_A, edges_B]
 
         # suma wektorowa
-        if method == 'Canny CV2':
+        if method == 'Canny CV2' or 'Canny':
             edges_sum = np.maximum.reduce(edges)
         else:
             edges_sum = np.sqrt(
@@ -140,7 +141,7 @@ def detect_edges(img, color_space='RGB', method='Sobel',
 
         edges = [edges_C, edges_M, edges_Y, edges_K]
 
-        if method == 'Canny CV2':
+        if method == 'Canny CV2' or 'Canny':
             edges_sum = np.maximum.reduce(edges)
         else:
             edges_sum = np.max(np.stack(edges, axis=0), axis=0)
