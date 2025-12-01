@@ -147,8 +147,18 @@ class ComparisonFrame:
         self.color_space_combo.current(0)
         self.color_space_combo.pack(side="left", padx=5)
 
-        self.method_combo = ttk.Combobox(top, state="readonly", width=10)
-        self.method_combo['values'] = ['Sobel', 'Laplacian', 'Scharr', 'Prewitt', 'Canny', 'Canny CV2', 'Roberts']
+        self.method_combo = ttk.Combobox(top, state="readonly", width=25)
+        self.method_combo['values'] = [
+            'Sobel',
+            'Laplacian 4-neighbor',
+            'Laplacian 8-neighbor',
+            'Laplacian LoG',
+            'Scharr',
+            'Prewitt',
+            'Canny',
+            'Canny CV2',
+            'Roberts'
+        ]
         self.method_combo.current(0)
         self.method_combo.pack(side="left", padx=5)
 
