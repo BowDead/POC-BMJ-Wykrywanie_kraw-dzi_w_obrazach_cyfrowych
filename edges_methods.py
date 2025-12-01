@@ -45,12 +45,70 @@ def sobel_edges(channel, low_t=0, high_t=255):
 
 
 def laplacian_edges(channel, low_t=0, high_t=255):
-    """Edge detection using Laplacian filter without cv2.Laplacian."""
+    """Compatibility alias for the 4-neighbor Laplacian variant.
+
+    The repository now exposes three Laplacian variants:
+    - `laplacian_edges_4` : 4-neighbor kernel (cross)
+    - `laplacian_edges_8` : 8-neighbor kernel (full 3x3)
+    - `laplacian_edges_log`: Laplacian of Gaussian (5x5 LoG kernel)
+
+    `laplacian_edges` is kept as an alias to `laplacian_edges_4` for backward compatibility.
+    """
+
+    return laplacian_edges_4(channel, low_t, high_t)
+
+
+def laplacian_edges_4(channel, low_t=0, high_t=255):
+    """Edge detection using 4-neighbor Laplacian kernel (cross).
+
+    Kernel:
+      [0, 1, 0]
+      [1,-4, 1]
+      [0, 1, 0]
+    """
     laplacian_kernel = np.array([[0,  1, 0],
                                  [1, -4, 1],
                                  [0,  1, 0]], dtype=np.float64)
 
     lap = fast_convolve2d(channel, laplacian_kernel)
+    lap = np.clip(lap, low_t, high_t)
+
+    return cv2.convertScaleAbs(lap)
+
+
+def laplacian_edges_8(channel, low_t=0, high_t=255):
+    """Edge detection using 8-neighbor Laplacian kernel (full 3x3).
+
+    Kernel:
+      [1, 1, 1]
+      [1,-8, 1]
+      [1, 1, 1]
+    """
+    kernel_8 = np.array([[1, 1, 1],
+                         [1,-8, 1],
+                         [1, 1, 1]], dtype=np.float64)
+
+    lap = fast_convolve2d(channel, kernel_8)
+    lap = np.clip(lap, low_t, high_t)
+
+    return cv2.convertScaleAbs(lap)
+
+
+def laplacian_edges_log(channel, low_t=0, high_t=255):
+    """Laplacian of Gaussian (LoG) approximate 5x5 kernel.
+
+    Uses a small 5x5 LoG kernel to provide smoothing + second-derivative.
+    """
+    # 5x5 LoG kernel (approximation)
+    log_kernel = np.array([
+        [0,  0, -1,  0,  0],
+        [0, -1, -2, -1,  0],
+        [-1,-2, 16, -2, -1],
+        [0, -1, -2, -1,  0],
+        [0,  0, -1,  0,  0]
+    ], dtype=np.float64)
+
+    lap = fast_convolve2d(channel, log_kernel)
     lap = np.clip(lap, low_t, high_t)
 
     return cv2.convertScaleAbs(lap)
