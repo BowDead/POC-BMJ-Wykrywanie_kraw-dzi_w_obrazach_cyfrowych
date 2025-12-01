@@ -147,10 +147,12 @@ class ComparisonFrame:
         self.color_space_combo.current(0)
         self.color_space_combo.pack(side="left", padx=5)
 
-        self.method_combo = ttk.Combobox(top, state="readonly", width=10)
-        self.method_combo['values'] = ['Sobel', 'Laplacian', 'Scharr', 'Prewitt', 'Canny', 'Canny CV2', 'Roberts']
+        self.method_combo = ttk.Combobox(top, state="readonly", width=25)
+        self.method_combo['values'] = ['Sobel', 'Laplacian (4-neigh)', 'Laplacian (8-neigh)', 'Laplacian (weighted)', 'Scharr', 'Prewitt', 'Canny', 'Canny CV2', 'Roberts']
         self.method_combo.current(0)
         self.method_combo.pack(side="left", padx=5)
+
+        # (No kernel matrix display)
 
         # --- spinboxy progów filtrów ---
         self.low_threshold = tk.IntVar(value=0)
@@ -376,6 +378,8 @@ class ComparisonFrame:
         except Exception as e:
             messagebox.showerror(get_text("UNKNOWN_ERROR"), str(e)) # Zmiana
             self.status_label.config(text=get_text("STATUS_ERROR"), fg="red") # Zmiana
+
+    
 
     def show_preview(self, event, index):
         if index >= len(self.pil_images) or self.pil_images[index] is None:

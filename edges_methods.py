@@ -56,6 +56,41 @@ def laplacian_edges(channel, low_t=0, high_t=255):
     return cv2.convertScaleAbs(lap)
 
 
+def laplacian_edges_variant1(channel, low_t=0, high_t=255):
+    """Laplacian variant 1: 8-neighbor Laplacian.
+
+    Kernel:
+    [[-1, -1, -1],
+     [-1,  8, -1],
+     [-1, -1, -1]]
+    """
+    kernel = np.array([[-1., -1., -1.],
+                       [-1.,  8., -1.],
+                       [-1., -1., -1.]], dtype=np.float64)
+
+    lap = fast_convolve2d(channel, kernel)
+    lap = np.clip(lap, low_t, high_t)
+    # use convertScaleAbs to get uint8 similar to other laplacian
+    return cv2.convertScaleAbs(lap)
+
+
+def laplacian_edges_variant2(channel, low_t=0, high_t=255):
+    """Laplacian variant 2: weighted Laplacian approximation.
+
+    Kernel:
+    [[ 1, -2,  1],
+     [-2,  4, -2],
+     [ 1, -2,  1]]
+    """
+    kernel = np.array([[1., -2., 1.],
+                       [-2., 4., -2.],
+                       [1., -2., 1.]], dtype=np.float64)
+
+    lap = fast_convolve2d(channel, kernel)
+    lap = np.clip(lap, low_t, high_t)
+    return cv2.convertScaleAbs(lap)
+
+
 def scharr_edges(channel, low_t=0, high_t=255):
     """Edge detection using Scharr filter without cv2.Scharr."""
     scharr_x = np.array([[-3, 0, 3],
