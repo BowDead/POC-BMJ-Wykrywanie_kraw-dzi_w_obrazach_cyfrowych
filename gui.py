@@ -7,6 +7,19 @@ from PIL import Image, ImageTk
 
 from edges_detection import detect_edges
 
+import sys
+
+def get_exe_dir():
+    """Zwraca folder, w którym leży aktualnie uruchomiony .exe (lub skrypt .py)"""
+    if getattr(sys, 'frozen', False):
+        # Program uruchomiony jako .exe (PyInstaller)
+        return os.path.dirname(sys.executable)
+    else:
+        # Program uruchomiony jako zwykły .py
+        return os.path.dirname(os.path.abspath(__file__))
+
+
+
 # Aktualny język ('pl' lub 'en')
 current_language = 'pl'
 
@@ -110,8 +123,8 @@ shared_image_cv2 = None
 shared_image_pil = None
 shared_image_path = None
 
-# ===== FOLDERY DOMYŚLNE =====
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+# Używaj tego zamiast BASE_DIR
+BASE_DIR = get_exe_dir()
 SAMPLES_DIR = os.path.join(BASE_DIR, "Przykładowe obrazy")
 OUTPUT_DIR = os.path.join(BASE_DIR, "Zapisane obrazy wynikowe")
 
