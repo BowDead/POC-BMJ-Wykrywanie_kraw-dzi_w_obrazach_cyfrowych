@@ -147,8 +147,18 @@ class ComparisonFrame:
         self.color_space_combo.current(0)
         self.color_space_combo.pack(side="left", padx=5)
 
-        self.method_combo = ttk.Combobox(top, state="readonly", width=10)
-        self.method_combo['values'] = ['Sobel', 'Laplacian', 'Scharr', 'Prewitt', 'Canny', 'Roberts']
+        self.method_combo = ttk.Combobox(top, state="readonly", width=25)
+        self.method_combo['values'] = [
+            'Sobel',
+            'Laplacian 4-neighbor',
+            'Laplacian 8-neighbor',
+            'Laplacian LoG',
+            'Scharr',
+            'Prewitt',
+            'Canny',
+            'Canny CV2',
+            'Roberts'
+        ]
         self.method_combo.current(0)
         self.method_combo.pack(side="left", padx=5)
 
@@ -170,6 +180,10 @@ class ComparisonFrame:
         self.binary_var = tk.BooleanVar(value=False)
         self.binary_check = tk.Checkbutton(top, text=get_text('BINARYZATION'), variable=self.binary_var) # Zmiana
         self.binary_check.pack(side="left", padx=10)
+        
+        # Przycisk usuwania tej ramki (minus na ramce)
+        self.remove_btn = tk.Button(top, text=get_text('REMOVE_FRAME'), width=3, command=self.remove_self)
+        self.remove_btn.pack(side="right", padx=5)
         
 
         # --- obszar na obrazy ---
@@ -255,6 +269,12 @@ class ComparisonFrame:
 
         for btn in self.save_buttons:
             btn.config(text=get_text('SAVE'))
+
+        # Aktualizuj przycisk usuwania ramki
+        try:
+            self.remove_btn.config(text=get_text('REMOVE_FRAME'))
+        except Exception:
+            pass
 
 
     # --- ustawienie obrazu współdzielonego ---
@@ -428,6 +448,18 @@ class ComparisonFrame:
             self.preview_window.destroy()
             self.preview_window = None
 
+    def remove_self(self):
+        """Usuwa tę instancję ComparisonFrame z listy i GUI."""
+        try:
+            comparison_frames.remove(self)
+        except ValueError:
+            pass
+        try:
+            self.frame.destroy()
+        except Exception:
+            pass
+        update_scroll_region()
+
 # ===== Funkcje zarządzania modułami =====
 def add_comparison():
     frame = ComparisonFrame(scrollable_frame)
@@ -450,6 +482,14 @@ def update_scroll_region(event=None):
 
 
 def on_mousewheel(event):
+    # On Windows event.delta > 0 means wheel up. When there's only one box,
+    # ignore upward scrolling to prevent moving the view above the single box.
+    try:
+        if len(comparison_frames) <= 1 and event.delta > 0:
+            return
+    except Exception:
+        pass
+
     canvas.yview_scroll(int(-1 * (event.delta / 120)), "units")
 
 # Funkcja przełączająca język
@@ -462,7 +502,6 @@ def switch_language(lang):
 
     # Aktualizacja głównego paska sterowania
     add_btn.config(text=get_text('ADD_FRAME'))
-    remove_btn.config(text=get_text('REMOVE_FRAME'))
     choose_img_btn.config(text=get_text('CHOOSE_IMAGE'))
     run_all_btn.config(text=get_text('RUN_FUNCTION'))
     lang_label.config(text=get_text('LANGUAGE'))
@@ -493,8 +532,6 @@ main_controls.pack(fill="x")
 # przyciski zarządzania ramkami
 add_btn = tk.Button(main_controls, text=get_text('ADD_FRAME'), command=add_comparison, width=3)
 add_btn.pack(side="left", padx=5)
-remove_btn = tk.Button(main_controls, text=get_text('REMOVE_FRAME'), command=remove_comparison, width=3)
-remove_btn.pack(side="left", padx=5)
 
 # przycisk wyboru obrazu
 def choose_shared_image():
