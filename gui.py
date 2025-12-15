@@ -4,8 +4,18 @@ import numpy as np
 import tkinter as tk
 from tkinter import ttk, filedialog, messagebox
 from PIL import Image, ImageTk
+import ctypes
 
 from edges_detection import detect_edges
+
+# Włączenie świadomości DPI dla Windows
+try:
+    ctypes.windll.shcore.SetProcessDpiAwareness(1)  # PROCESS_SYSTEM_DPI_AWARE
+except:
+    try:
+        ctypes.windll.user32.SetProcessDPIAware()
+    except:
+        pass
 
 # Aktualny język ('pl' lub 'en')
 current_language = 'pl'
@@ -101,7 +111,26 @@ def get_text(key):
 
 root = tk.Tk()
 root.title(get_text('APP_TITLE')) # Zmiana
-root.geometry("1600x900")
+
+# Pobranie rozdzielczości ekranu i ustalenie skali
+screen_width = root.winfo_screenwidth()
+screen_height = root.winfo_screenheight()
+
+# Obliczenie skali DPI
+dpi = root.winfo_fpixels('1i')
+scale_factor = dpi / 96.0  # 96 DPI to standard
+
+# Rozmiar canvas dostosowany do skali
+CANVAS_SIZE = int(200 * max(1.0, scale_factor * 0.7))  # Zwiększamy bazowy rozmiar dla wysokiego DPI
+
+# Ustawienie czcionek skalowanych
+default_font_size = int(9 * max(1.0, scale_factor * 0.8))
+button_font_size = int(9 * max(1.0, scale_factor * 0.8))
+label_font_size = int(8 * max(1.0, scale_factor * 0.8))
+
+root.option_add('*Font', f'TkDefaultFont {default_font_size}')
+root.option_add('*Button.Font', f'TkDefaultFont {button_font_size}')
+root.option_add('*Label.Font', f'TkDefaultFont {label_font_size}')
 
 root.state("zoomed")
 
@@ -120,7 +149,9 @@ os.makedirs(OUTPUT_DIR, exist_ok=True)
 
 
 # ===== Pomocnicze funkcje =====
-def resize_for_canvas(pil_image, frame_size=200):
+def resize_for_canvas(pil_image, frame_size=None):
+    if frame_size is None:
+        frame_size = CANVAS_SIZE
     w, h = pil_image.size
     scale_ratio = frame_size / max(w, h)
     new_w, new_h = int(w * scale_ratio), int(h * scale_ratio)
@@ -135,19 +166,23 @@ class ComparisonFrame:
         self.pil_images = []
 
         # --- główny frame ---
-        self.frame = tk.Frame(parent, pady=10, padx=10, bd=2, relief="groove")
-        self.frame.pack(side="top", fill="x", padx=10, pady=5)
+        pady_val = int(10 * max(1.0, scale_factor * 0.7))
+        padx_val = int(10 * max(1.0, scale_factor * 0.7))
+        self.frame = tk.Frame(parent, pady=pady_val, padx=padx_val, bd=2, relief="groove")
+        self.frame.pack(side="top", fill="x", padx=padx_val, pady=int(5 * max(1.0, scale_factor * 0.7)))
 
         # --- pasek górny ---
         top = tk.Frame(self.frame)
-        top.pack(fill="x", pady=5)
+        top.pack(fill="x", pady=int(5 * max(1.0, scale_factor * 0.7)))
 
-        self.color_space_combo = ttk.Combobox(top, state="readonly", width=10)
+        combo_width = int(10 * max(1.0, scale_factor * 0.6))
+        self.color_space_combo = ttk.Combobox(top, state="readonly", width=combo_width)
         self.color_space_combo['values'] = ['RGB', 'HSV', 'LAB', 'CMYK']
         self.color_space_combo.current(0)
-        self.color_space_combo.pack(side="left", padx=5)
+        self.color_space_combo.pack(side="left", padx=int(5 * max(1.0, scale_factor * 0.7)))
 
-        self.method_combo = ttk.Combobox(top, state="readonly", width=25)
+        method_combo_width = int(25 * max(1.0, scale_factor * 0.6))
+        self.method_combo = ttk.Combobox(top, state="readonly", width=method_combo_width)
         self.method_combo['values'] = [
             'Sobel',
             'Laplacian 4-neighbor',
@@ -160,30 +195,35 @@ class ComparisonFrame:
             'Roberts'
         ]
         self.method_combo.current(0)
-        self.method_combo.pack(side="left", padx=5)
+        self.method_combo.pack(side="left", padx=int(5 * max(1.0, scale_factor * 0.7)))
 
         # --- spinboxy progów filtrów ---
         self.low_threshold = tk.IntVar(value=0)
         self.high_threshold = tk.IntVar(value=255)
 
-        tk.Label(top, text="Low T:").pack(side="left", padx=3)
-        self.low_spin = tk.Spinbox(top, from_=0, to=255, width=5, textvariable=self.low_threshold)
-        self.low_spin.pack(side="left", padx=3)
+        spinbox_width = int(5 * max(1.0, scale_factor * 0.7))
+        padx_small = int(3 * max(1.0, scale_factor * 0.7))
+        padx_medium = int(10 * max(1.0, scale_factor * 0.7))
+        
+        tk.Label(top, text="Low T:").pack(side="left", padx=padx_small)
+        self.low_spin = tk.Spinbox(top, from_=0, to=255, width=spinbox_width, textvariable=self.low_threshold)
+        self.low_spin.pack(side="left", padx=padx_small)
 
-        tk.Label(top, text="High T:").pack(side="left", padx=3)
-        self.high_spin = tk.Spinbox(top, from_=1, to=255, width=5, textvariable=self.high_threshold)
-        self.high_spin.pack(side="left", padx=3)
+        tk.Label(top, text="High T:").pack(side="left", padx=padx_small)
+        self.high_spin = tk.Spinbox(top, from_=1, to=255, width=spinbox_width, textvariable=self.high_threshold)
+        self.high_spin.pack(side="left", padx=padx_small)
 
         self.status_label = tk.Label(top, text=get_text('STATUS_NO_IMAGE'), fg="gray") # Zmiana
-        self.status_label.pack(side="left", padx=10)
+        self.status_label.pack(side="left", padx=padx_medium)
 
         self.binary_var = tk.BooleanVar(value=False)
         self.binary_check = tk.Checkbutton(top, text=get_text('BINARYZATION'), variable=self.binary_var) # Zmiana
-        self.binary_check.pack(side="left", padx=10)
+        self.binary_check.pack(side="left", padx=padx_medium)
         
         # Przycisk usuwania tej ramki (minus na ramce)
-        self.remove_btn = tk.Button(top, text=get_text('REMOVE_FRAME'), width=3, command=self.remove_self)
-        self.remove_btn.pack(side="right", padx=5)
+        btn_width = int(3 * max(1.0, scale_factor * 0.7))
+        self.remove_btn = tk.Button(top, text=get_text('REMOVE_FRAME'), width=btn_width, command=self.remove_self)
+        self.remove_btn.pack(side="right", padx=int(5 * max(1.0, scale_factor * 0.7)))
         
 
         # --- obszar na obrazy ---
@@ -201,9 +241,9 @@ class ComparisonFrame:
 
     def _create_canvas_block(self, title):
         subframe = tk.Frame(self.canvas_frame)
-        subframe.pack(side="left", padx=5, anchor="w")
+        subframe.pack(side="left", padx=int(5 * max(1.0, scale_factor * 0.7)), anchor="w")
 
-        canvas = tk.Canvas(subframe, width=200, height=200, bg="#ddd")
+        canvas = tk.Canvas(subframe, width=CANVAS_SIZE, height=CANVAS_SIZE, bg="#ddd")
         canvas.pack()
 
         # Zmień kursor na pointer
@@ -226,7 +266,7 @@ class ComparisonFrame:
             text=get_text('SAVE'), # Zmiana
             command=lambda idx=len(self.canvas_list): self.save_image(idx)
         )
-        save_btn.pack(pady=3)
+        save_btn.pack(pady=int(3 * max(1.0, scale_factor * 0.7)))
 
         self.canvas_list.append(canvas)
         self.label_list.append(label)
@@ -286,8 +326,7 @@ class ComparisonFrame:
 
     # --- wyświetlenie obrazu w kanwie ---
     def display_image(self, pil_image, index):
-        frame_size = 200
-        pil_resized = resize_for_canvas(pil_image, frame_size)
+        pil_resized = resize_for_canvas(pil_image, CANVAS_SIZE)
         img_tk = ImageTk.PhotoImage(pil_resized)
 
         while len(self.tk_images) <= index:
@@ -526,12 +565,14 @@ def switch_language(lang):
 
 
 # ===== Główne przyciski (Zmienione, aby umożliwić aktualizację tekstu) =====
-main_controls = tk.Frame(root, pady=10)
+main_pady = int(10 * max(1.0, scale_factor * 0.7))
+main_controls = tk.Frame(root, pady=main_pady)
 main_controls.pack(fill="x")
 
 # przyciski zarządzania ramkami
-add_btn = tk.Button(main_controls, text=get_text('ADD_FRAME'), command=add_comparison, width=3)
-add_btn.pack(side="left", padx=5)
+btn_width = int(3 * max(1.0, scale_factor * 0.7))
+add_btn = tk.Button(main_controls, text=get_text('ADD_FRAME'), command=add_comparison, width=btn_width)
+add_btn.pack(side="left", padx=int(5 * max(1.0, scale_factor * 0.7)))
 
 # przycisk wyboru obrazu
 def choose_shared_image():
@@ -560,7 +601,7 @@ def choose_shared_image():
 
 
 choose_img_btn = tk.Button(main_controls, text=get_text('CHOOSE_IMAGE'), command=choose_shared_image) # Zmiana
-choose_img_btn.pack(side="left", padx=10)
+choose_img_btn.pack(side="left", padx=int(10 * max(1.0, scale_factor * 0.7)))
 
 # przycisk uruchom funkcję
 def run_all():
@@ -572,26 +613,27 @@ def run_all():
 
 
 run_all_btn = tk.Button(main_controls, text=get_text('RUN_FUNCTION'), command=run_all, bg="#4CAF50", fg="white") # Zmiana
-run_all_btn.pack(side="left", padx=10)
+run_all_btn.pack(side="left", padx=int(10 * max(1.0, scale_factor * 0.7)))
 
 image_status_label = tk.Label(main_controls, text=get_text('IMAGE_NOT_LOADED'), fg="gray") # Zmiana
-image_status_label.pack(side="left", padx=10)
+image_status_label.pack(side="left", padx=int(10 * max(1.0, scale_factor * 0.7)))
 
 
 # Przełącznik języka (Dodany ponownie)
 lang_frame = tk.Frame(main_controls)
-lang_frame.pack(side="right", padx=10)
+lang_frame.pack(side="right", padx=int(10 * max(1.0, scale_factor * 0.7)))
 
 lang_label = tk.Label(lang_frame, text=get_text('LANGUAGE'))
 lang_label.pack(side="left")
 
 lang_var = tk.StringVar(value=get_text('LANG_PL'))
 
+lang_combo_width = int(15 * max(1.0, scale_factor * 0.6))
 lang_combo = ttk.Combobox(
     lang_frame,
     textvariable=lang_var,
     state="readonly",
-    width=15
+    width=lang_combo_width
 )
 lang_combo['values'] = [get_text('LANG_PL'), get_text('LANG_EN')]
 lang_combo.pack(side="left")
