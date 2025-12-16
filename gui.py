@@ -73,6 +73,11 @@ TRANSLATIONS = {
         'CHANNEL_L': 'L', 'CHANNEL_A': 'A', 'CHANNEL_B': 'B',
         'CHANNEL_C': 'C', 'CHANNEL_M': 'M', 'CHANNEL_Y': 'Y', 'CHANNEL_K': 'K',
         'EDGE_SUM_TITLE': 'Suma krawędzi',
+        # Globalne ustawienia
+        'GLOBAL_COLOR_SPACE': 'Globalna przestrzeń barw',
+        'GLOBAL_METHOD': 'Globalna metoda',
+        'APPLY_COLOR_ALL': 'Zastosuj przestrzeń do wszystkich',
+        'APPLY_METHOD_ALL': 'Zastosuj metodę do wszystkich',
     },
     'en': {
         # Tytuł aplikacji
@@ -112,6 +117,11 @@ TRANSLATIONS = {
         'CHANNEL_L': 'L', 'CHANNEL_A': 'A', 'CHANNEL_B': 'B',
         'CHANNEL_C': 'C', 'CHANNEL_M': 'M', 'CHANNEL_Y': 'Y', 'CHANNEL_K': 'K',
         'EDGE_SUM_TITLE': 'Edge Sum',
+        # Global settings
+        'GLOBAL_COLOR_SPACE': 'Global color space',
+        'GLOBAL_METHOD': 'Global method',
+        'APPLY_COLOR_ALL': 'Apply color space to all',
+        'APPLY_METHOD_ALL': 'Apply method to all',
     }
 }
 
@@ -177,6 +187,7 @@ class ComparisonFrame:
         self.cv2_image = None
         self.tk_images = []
         self.pil_images = []
+        self.persistent_windows = []
 
         # --- główny frame ---
         pady_val = int(10 * max(1.0, scale_factor * 0.7))
@@ -198,6 +209,7 @@ class ComparisonFrame:
         self.method_combo = ttk.Combobox(top, state="readonly", width=method_combo_width)
         self.method_combo['values'] = [
             'Sobel',
+            'Sobel CV2',
             'Laplacian 4-neighbor',
             'Laplacian 8-neighbor',
             'Laplacian LoG',
@@ -209,6 +221,11 @@ class ComparisonFrame:
         ]
         self.method_combo.current(0)
         self.method_combo.pack(side="left", padx=int(5 * max(1.0, scale_factor * 0.7)))
+        
+        # Tooltip dla maski metody
+        self.tooltip_window = None
+        self.method_combo.bind("<Enter>", self.show_mask_tooltip)
+        self.method_combo.bind("<Leave>", self.hide_mask_tooltip)
 
         # --- spinboxy progów filtrów ---
         self.low_threshold = tk.IntVar(value=0)
@@ -265,11 +282,14 @@ class ComparisonFrame:
         # Bind kliknięcia, przeciągania i puszczenia
         subframe.bind("<ButtonPress-1>", lambda e, idx=len(self.canvas_list): self.show_preview(e, idx))
         subframe.bind("<ButtonRelease-1>", lambda e: self.hide_preview())
+        # Kliknięcie prawym przyciskiem – trwałe okno z obrazem
+        subframe.bind("<Button-3>", lambda e, idx=len(self.canvas_list): self.open_persistent_window(idx))
 
         # Przekierowanie eventów z canvasa
         canvas.bind("<ButtonPress-1>", lambda e: subframe.event_generate("<ButtonPress-1>"))
         # canvas.bind("<B1-Motion>", lambda e: subframe.event_generate("<B1-Motion>"))
         canvas.bind("<ButtonRelease-1>", lambda e: subframe.event_generate("<ButtonRelease-1>"))
+        canvas.bind("<Button-3>", lambda e: subframe.event_generate("<Button-3>"))
 
         label = tk.Label(subframe, text=title)
         label.pack()
@@ -500,11 +520,253 @@ class ComparisonFrame:
             self.preview_window.destroy()
             self.preview_window = None
 
+    def open_persistent_window(self, index):
+        """Otwiera trwałe okno z wybranym obrazem (prawy klik)."""
+        if index >= len(self.pil_images) or self.pil_images[index] is None:
+            return
+
+        img = self.pil_images[index]
+
+        # Użyj tych samych wymiarów co tymczasowy podgląd (3x canvas - 10px)
+        canvas = self.canvas_list[index]
+        zoom_w, zoom_h = int(canvas["width"]) * 3, int(canvas["height"]) * 3
+        zoom_w -= 10
+        zoom_h -= 10
+        zoomed = img.resize((zoom_w, zoom_h), Image.LANCZOS)
+        imgtk = ImageTk.PhotoImage(zoomed)
+
+        win = tk.Toplevel(root)
+        label_text = self.label_list[index].cget("text") if index < len(self.label_list) else ""
+
+        # Złóż tytuł z właściwości obrazu / ustawień
+        base_name = os.path.splitext(os.path.basename(shared_image_path))[0] if shared_image_path else ""
+        cs = self.color_space_combo.get() if hasattr(self, 'color_space_combo') else ""
+        method = self.method_combo.get() if hasattr(self, 'method_combo') else ""
+        try:
+            lt = int(self.low_threshold.get())
+            ht = int(self.high_threshold.get())
+        except Exception:
+            lt, ht = 0, 255
+        bin_flag = 1 if self.binary_var.get() else 0
+
+        title_parts = []
+        if base_name:
+            title_parts.append(base_name)
+        if label_text:
+            title_parts.append(label_text)
+        if cs:
+            title_parts.append(cs)
+        if method:
+            title_parts.append(method)
+        title_parts.append(f"LT:{lt} HT:{ht}")
+        title_parts.append(f"Bin:{bin_flag}")
+
+        title_str = " | ".join(title_parts) if title_parts else get_text('APP_TITLE')
+        try:
+            win.title(title_str)
+        except Exception:
+            pass
+
+        # Ustaw jako okno podrzędne, aby zawsze było nad aplikacją, ale nie nad innymi programami
+        try:
+            win.transient(root)
+            win.lift(root)
+        except Exception:
+            pass
+        win.attributes("-topmost", False)
+
+        # Ramka i label na obraz
+        outer = tk.Frame(win, bg="black", bd=2)
+        outer.pack(padx=2, pady=2)
+        inner = tk.Frame(outer, bg="white", bd=2)
+        inner.pack(padx=2, pady=2)
+        lbl = tk.Label(inner, image=imgtk, borderwidth=0, bg="white")
+        lbl.pack()
+
+        # Wyśrodkuj okno na ekranie podobnie jak podgląd
+        try:
+            screen_w = root.winfo_screenwidth()
+            screen_h = root.winfo_screenheight()
+        except Exception:
+            screen_w, screen_h = 1280, 800
+        try:
+            window_w = zoom_w + 20
+            window_h = zoom_h + 20
+            center_x = (screen_w - window_w) // 2
+            center_y = (screen_h - window_h) // 2
+            win.geometry(f"{window_w}x{window_h}+{center_x}+{center_y}")
+        except Exception:
+            pass
+
+        # Zachowaj referencję, aby obraz nie został zebrany przez GC
+        win._imgtk = imgtk
+        self.persistent_windows.append(win)
+
+        # Zablokuj możliwość zmiany rozmiaru okna kursorem
+        try:
+            win.resizable(False, False)
+            win.update_idletasks()
+            fixed_w = win.winfo_width()
+            fixed_h = win.winfo_height()
+            win.minsize(fixed_w, fixed_h)
+            win.maxsize(fixed_w, fixed_h)
+        except Exception:
+            pass
+    
+    def get_mask_visualization(self, method):
+        """Tworzy wizualizację maski dla danej metody."""
+        masks = {
+            'Sobel': [
+                (np.array([[-1, 0, 1], [-2, 0, 2], [-1, 0, 1]]), "Gx"),
+                (np.array([[-1, -2, -1], [0, 0, 0], [1, 2, 1]]), "Gy")
+            ],
+            'Sobel CV2': [
+                (np.array([[-1, 0, 1], [-2, 0, 2], [-1, 0, 1]]), "Gx"),
+                (np.array([[-1, -2, -1], [0, 0, 0], [1, 2, 1]]), "Gy")
+            ],
+            'Laplacian 4-neighbor': [
+                (np.array([[0, 1, 0], [1, -4, 1], [0, 1, 0]]), "4-neighbor")
+            ],
+            'Laplacian 8-neighbor': [
+                (np.array([[1, 1, 1], [1, -8, 1], [1, 1, 1]]), "8-neighbor")
+            ],
+            'Laplacian LoG': [
+                (np.array([[0, 0, -1, 0, 0], [0, -1, -2, -1, 0], [-1, -2, 16, -2, -1], 
+                          [0, -1, -2, -1, 0], [0, 0, -1, 0, 0]]), "LoG 5x5")
+            ],
+            'Scharr': [
+                (np.array([[-3, 0, 3], [-10, 0, 10], [-3, 0, 3]]), "Gx"),
+                (np.array([[-3, -10, -3], [0, 0, 0], [3, 10, 3]]), "Gy")
+            ],
+            'Prewitt': [
+                (np.array([[-1, 0, 1], [-1, 0, 1], [-1, 0, 1]]), "Gx"),
+                (np.array([[1, 1, 1], [0, 0, 0], [-1, -1, -1]]), "Gy")
+            ],
+            'Roberts': [
+                (np.array([[1, 0], [0, -1]]), "Gx"),
+                (np.array([[0, 1], [-1, 0]]), "Gy")
+            ],
+            'Canny': [
+                (np.array([[-1, 0, 1], [-2, 0, 2], [-1, 0, 1]]), "Sobel Gx"),
+                (np.array([[-1, -2, -1], [0, 0, 0], [1, 2, 1]]), "Sobel Gy")
+            ],
+            'Canny CV2': [
+                (np.array([[-1, 0, 1], [-2, 0, 2], [-1, 0, 1]]), "Sobel Gx"),
+                (np.array([[-1, -2, -1], [0, 0, 0], [1, 2, 1]]), "Sobel Gy")
+            ]
+        }
+        
+        return masks.get(method, [])
+    
+    def show_mask_tooltip(self, event):
+        """Pokazuje tooltip z wizualizacją maski."""
+        method = self.method_combo.get()
+        masks = self.get_mask_visualization(method)
+        
+        if not masks:
+            return
+        
+        # Ukryj stary tooltip jeśli istnieje
+        self.hide_mask_tooltip()
+        
+        # Stwórz okno tooltip
+        self.tooltip_window = tk.Toplevel()
+        self.tooltip_window.overrideredirect(True)
+        self.tooltip_window.attributes("-topmost", True)
+        
+        # Ramka z ciemnym obramowaniem
+        outer_frame = tk.Frame(self.tooltip_window, bg="black", bd=1)
+        outer_frame.pack(padx=1, pady=1)
+        
+        inner_frame = tk.Frame(outer_frame, bg="white", bd=3)
+        inner_frame.pack(padx=2, pady=2)
+        
+        # Tytuł
+        title_label = tk.Label(inner_frame, text=f"Maska: {method}", 
+                               font=("TkDefaultFont", int(10 * max(1.0, scale_factor * 0.8)), "bold"),
+                               bg="white")
+        title_label.pack(pady=(5, 10))
+        
+        # Dla każdej maski (Gx, Gy, etc.)
+        for mask_array, mask_name in masks:
+            mask_frame = tk.Frame(inner_frame, bg="white")
+            mask_frame.pack(pady=5)
+            
+            # Nazwa maski (Gx, Gy)
+            name_label = tk.Label(mask_frame, text=mask_name, 
+                                 font=("TkDefaultFont", int(9 * max(1.0, scale_factor * 0.8)), "bold"),
+                                 bg="white")
+            name_label.pack()
+            
+            # Wizualizacja maski
+            cell_size = 40
+            rows, cols = mask_array.shape
+            
+            canvas = tk.Canvas(mask_frame, width=cols * cell_size, height=rows * cell_size, 
+                             bg="white", highlightthickness=0)
+            canvas.pack(pady=5)
+            
+            # Normalizacja do kolorów
+            mask_min = mask_array.min()
+            mask_max = mask_array.max()
+            
+            for i in range(rows):
+                for j in range(cols):
+                    val = mask_array[i, j]
+                    
+                    # Kolor: czerwony dla ujemnych, zielony dla dodatnich, biały dla 0
+                    if val < 0:
+                        intensity = int(255 * abs(val - mask_min) / (abs(mask_min) + 1e-10))
+                        color = f"#{intensity:02x}{0:02x}{0:02x}"
+                    elif val > 0:
+                        intensity = int(255 * val / (mask_max + 1e-10))
+                        color = f"#{0:02x}{intensity:02x}{0:02x}"
+                    else:
+                        color = "#ffffff"
+                    
+                    x1, y1 = j * cell_size, i * cell_size
+                    x2, y2 = x1 + cell_size, y1 + cell_size
+                    
+                    # Rysuj komórkę
+                    canvas.create_rectangle(x1, y1, x2, y2, fill=color, outline="black", width=1)
+                    
+                    # Dodaj tekst z wartością
+                    text_color = "white" if abs(val) > (mask_max - mask_min) / 2 else "black"
+                    canvas.create_text((x1 + x2) / 2, (y1 + y2) / 2, 
+                                     text=str(int(val)) if val == int(val) else f"{val:.1f}",
+                                     font=("TkDefaultFont", int(11 * max(1.0, scale_factor * 0.8)), "bold"),
+                                     fill=text_color)
+        
+        # Pozycja tooltip
+        x = self.method_combo.winfo_rootx() + 10
+        y = self.method_combo.winfo_rooty() + self.method_combo.winfo_height() + 5
+        
+        self.tooltip_window.geometry(f"+{x}+{y}")
+        self.tooltip_window.update_idletasks()
+    
+    def hide_mask_tooltip(self, event=None):
+        """Ukrywa tooltip z maską."""
+        if self.tooltip_window:
+            self.tooltip_window.destroy()
+            self.tooltip_window = None
+
     def remove_self(self):
         """Usuwa tę instancję ComparisonFrame z listy i GUI."""
         try:
             comparison_frames.remove(self)
         except ValueError:
+            pass
+        # Zamknij okna trwałe powiązane z tą ramką
+        try:
+            for w in getattr(self, 'persistent_windows', []):
+                try:
+                    if w and w.winfo_exists():
+                        w.destroy()
+                except Exception:
+                    pass
+            if hasattr(self, 'persistent_windows'):
+                self.persistent_windows.clear()
+        except Exception:
             pass
         try:
             self.frame.destroy()
@@ -518,6 +780,12 @@ def add_comparison():
     comparison_frames.append(frame)
     if shared_image_pil is not None and shared_image_cv2 is not None:
         frame.set_shared_image(shared_image_pil, shared_image_cv2, shared_image_path)
+    # Ustaw domyślne wartości z globalnych comboboxów dla nowej ramki
+    try:
+        frame.color_space_combo.set(global_color_space_var.get())
+        frame.method_combo.set(global_method_var.get())
+    except Exception:
+        pass
     update_scroll_region()
 
 
@@ -575,6 +843,15 @@ def switch_language(lang):
     # Aktualizacja wszystkich instancji modułów
     for frame in comparison_frames:
         frame.update_texts()
+
+    # Aktualizacja globalnych etykiet i przycisków
+    try:
+        global_color_label.config(text=get_text('GLOBAL_COLOR_SPACE'))
+        global_method_label.config(text=get_text('GLOBAL_METHOD'))
+        apply_color_btn.config(text=get_text('APPLY_COLOR_ALL'))
+        apply_method_btn.config(text=get_text('APPLY_METHOD_ALL'))
+    except Exception:
+        pass
 
 
 # ===== Główne przyciski (Zmienione, aby umożliwić aktualizację tekstu) =====
@@ -660,6 +937,74 @@ def language_changed(event):
 
 lang_combo.bind('<<ComboboxSelected>>', language_changed)
 
+
+# ===== Globalne / domyślne ustawienia dla nowych kontenerów =====
+global_defaults_container = tk.Frame(root, pady=int(8 * max(1.0, scale_factor * 0.7)))
+global_defaults_container.pack(fill="x")
+
+# Górny rząd: etykiety + comboboxy
+globals_top = tk.Frame(global_defaults_container)
+globals_top.pack(fill="x")
+
+g_combo_width = int(10 * max(1.0, scale_factor * 0.6))
+g_method_combo_width = int(25 * max(1.0, scale_factor * 0.6))
+
+global_color_label = tk.Label(globals_top, text=get_text('GLOBAL_COLOR_SPACE'))
+global_color_label.pack(side="left", padx=int(8 * max(1.0, scale_factor * 0.7)))
+
+global_color_space_var = tk.StringVar(value='RGB')
+global_color_combo = ttk.Combobox(globals_top, state="readonly", width=g_combo_width,
+                                  textvariable=global_color_space_var)
+global_color_combo['values'] = ['RGB', 'HSV', 'LAB', 'CMYK']
+global_color_combo.pack(side="left", padx=int(5 * max(1.0, scale_factor * 0.7)))
+
+global_method_label = tk.Label(globals_top, text=get_text('GLOBAL_METHOD'))
+global_method_label.pack(side="left", padx=int(15 * max(1.0, scale_factor * 0.7)))
+
+global_method_var = tk.StringVar(value='Sobel')
+global_method_combo = ttk.Combobox(globals_top, state="readonly", width=g_method_combo_width,
+                                   textvariable=global_method_var)
+global_method_combo['values'] = [
+    'Sobel',
+    'Sobel CV2',
+    'Laplacian 4-neighbor',
+    'Laplacian 8-neighbor',
+    'Laplacian LoG',
+    'Scharr',
+    'Prewitt',
+    'Canny',
+    'Canny CV2',
+    'Roberts'
+]
+global_method_combo.pack(side="left", padx=int(5 * max(1.0, scale_factor * 0.7)))
+
+# Dolny rząd: przyciski Zastosuj do wszystkich
+globals_buttons = tk.Frame(global_defaults_container)
+globals_buttons.pack(fill="x", pady=int(5 * max(1.0, scale_factor * 0.7)))
+
+def apply_global_color_to_all():
+    val = global_color_space_var.get()
+    for frame in comparison_frames:
+        try:
+            frame.color_space_combo.set(val)
+        except Exception:
+            pass
+
+def apply_global_method_to_all():
+    val = global_method_var.get()
+    for frame in comparison_frames:
+        try:
+            frame.method_combo.set(val)
+        except Exception:
+            pass
+
+apply_color_btn = tk.Button(globals_buttons, text=get_text('APPLY_COLOR_ALL'), command=apply_global_color_to_all)
+apply_color_btn.pack(side="left", padx=int(8 * max(1.0, scale_factor * 0.7)))
+
+apply_method_btn = tk.Button(globals_buttons, text=get_text('APPLY_METHOD_ALL'), command=apply_global_method_to_all)
+apply_method_btn.pack(side="left", padx=int(8 * max(1.0, scale_factor * 0.7)))
+
+# Podpowiedź: nowe ramki będą używać wybranych ustawień jako domyślne
 
 # ===== Sekcja przewijana =====
 scroll_container = tk.Frame(root)
