@@ -2,6 +2,7 @@ import cv2
 import numpy as np
 from edges_methods import (
     sobel_edges,
+    sobel_cv2_edges,
     laplacian_edges_4,
     laplacian_edges_8,
     laplacian_edges_log,
@@ -25,6 +26,7 @@ def detect_edges(img, color_space='RGB', method='Sobel',
 
     methods_dict = {
         'Sobel': sobel_edges,
+        'Sobel CV2': sobel_cv2_edges,
         'Laplacian 4-neighbor': laplacian_edges_4,
         'Laplacian 8-neighbor': laplacian_edges_8,
         'Laplacian LoG': laplacian_edges_log,
