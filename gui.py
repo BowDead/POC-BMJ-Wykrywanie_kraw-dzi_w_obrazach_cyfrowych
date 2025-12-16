@@ -174,6 +174,7 @@ class ComparisonFrame:
         self.cv2_image = None
         self.tk_images = []
         self.pil_images = []
+        self.persistent_windows = []
 
         # --- główny frame ---
         pady_val = int(10 * max(1.0, scale_factor * 0.7))
@@ -268,11 +269,14 @@ class ComparisonFrame:
         # Bind kliknięcia, przeciągania i puszczenia
         subframe.bind("<ButtonPress-1>", lambda e, idx=len(self.canvas_list): self.show_preview(e, idx))
         subframe.bind("<ButtonRelease-1>", lambda e: self.hide_preview())
+        # Kliknięcie prawym przyciskiem – trwałe okno z obrazem
+        subframe.bind("<Button-3>", lambda e, idx=len(self.canvas_list): self.open_persistent_window(idx))
 
         # Przekierowanie eventów z canvasa
         canvas.bind("<ButtonPress-1>", lambda e: subframe.event_generate("<ButtonPress-1>"))
         # canvas.bind("<B1-Motion>", lambda e: subframe.event_generate("<B1-Motion>"))
         canvas.bind("<ButtonRelease-1>", lambda e: subframe.event_generate("<ButtonRelease-1>"))
+        canvas.bind("<Button-3>", lambda e: subframe.event_generate("<Button-3>"))
 
         label = tk.Label(subframe, text=title)
         label.pack()
@@ -502,6 +506,76 @@ class ComparisonFrame:
         if self.preview_window:
             self.preview_window.destroy()
             self.preview_window = None
+
+    def open_persistent_window(self, index):
+        """Otwiera trwałe okno z wybranym obrazem (prawy klik)."""
+        if index >= len(self.pil_images) or self.pil_images[index] is None:
+            return
+
+        img = self.pil_images[index]
+
+        # Dopasuj obraz do 80% ekranu z zachowaniem proporcji
+        try:
+            screen_w = root.winfo_screenwidth()
+            screen_h = root.winfo_screenheight()
+        except Exception:
+            screen_w, screen_h = 1280, 800
+
+        max_w = int(screen_w * 0.8)
+        max_h = int(screen_h * 0.8)
+
+        w, h = img.size
+        scale = min(max_w / w, max_h / h, 1.0)
+        disp_w = int(w * scale)
+        disp_h = int(h * scale)
+
+        disp_img = img if scale == 1.0 else img.resize((disp_w, disp_h), Image.LANCZOS)
+        imgtk = ImageTk.PhotoImage(disp_img)
+
+        win = tk.Toplevel(root)
+        label_text = self.label_list[index].cget("text") if index < len(self.label_list) else ""
+
+        # Złóż tytuł z właściwości obrazu / ustawień
+        base_name = os.path.splitext(os.path.basename(shared_image_path))[0] if shared_image_path else ""
+        cs = self.color_space_combo.get() if hasattr(self, 'color_space_combo') else ""
+        method = self.method_combo.get() if hasattr(self, 'method_combo') else ""
+        try:
+            lt = int(self.low_threshold.get())
+            ht = int(self.high_threshold.get())
+        except Exception:
+            lt, ht = 0, 255
+        bin_flag = 1 if self.binary_var.get() else 0
+
+        title_parts = []
+        if base_name:
+            title_parts.append(base_name)
+        if label_text:
+            title_parts.append(label_text)
+        if cs:
+            title_parts.append(cs)
+        if method:
+            title_parts.append(method)
+        title_parts.append(f"LT:{lt} HT:{ht}")
+        title_parts.append(f"Bin:{bin_flag}")
+
+        title_str = " | ".join(title_parts) if title_parts else get_text('APP_TITLE')
+        try:
+            win.title(title_str)
+        except Exception:
+            pass
+        win.attributes("-topmost", False)
+
+        # Ramka i label na obraz
+        outer = tk.Frame(win, bg="black", bd=2)
+        outer.pack(padx=2, pady=2)
+        inner = tk.Frame(outer, bg="white", bd=2)
+        inner.pack(padx=2, pady=2)
+        lbl = tk.Label(inner, image=imgtk, borderwidth=0, bg="white")
+        lbl.pack()
+
+        # Zachowaj referencję, aby obraz nie został zebrany przez GC
+        win._imgtk = imgtk
+        self.persistent_windows.append(win)
     
     def get_mask_visualization(self, method):
         """Tworzy wizualizację maski dla danej metody."""
