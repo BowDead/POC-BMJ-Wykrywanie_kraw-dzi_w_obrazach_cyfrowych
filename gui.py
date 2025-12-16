@@ -514,23 +514,13 @@ class ComparisonFrame:
 
         img = self.pil_images[index]
 
-        # Dopasuj obraz do 80% ekranu z zachowaniem proporcji
-        try:
-            screen_w = root.winfo_screenwidth()
-            screen_h = root.winfo_screenheight()
-        except Exception:
-            screen_w, screen_h = 1280, 800
-
-        max_w = int(screen_w * 0.8)
-        max_h = int(screen_h * 0.8)
-
-        w, h = img.size
-        scale = min(max_w / w, max_h / h, 1.0)
-        disp_w = int(w * scale)
-        disp_h = int(h * scale)
-
-        disp_img = img if scale == 1.0 else img.resize((disp_w, disp_h), Image.LANCZOS)
-        imgtk = ImageTk.PhotoImage(disp_img)
+        # Użyj tych samych wymiarów co tymczasowy podgląd (3x canvas - 10px)
+        canvas = self.canvas_list[index]
+        zoom_w, zoom_h = int(canvas["width"]) * 3, int(canvas["height"]) * 3
+        zoom_w -= 10
+        zoom_h -= 10
+        zoomed = img.resize((zoom_w, zoom_h), Image.LANCZOS)
+        imgtk = ImageTk.PhotoImage(zoomed)
 
         win = tk.Toplevel(root)
         label_text = self.label_list[index].cget("text") if index < len(self.label_list) else ""
@@ -563,6 +553,13 @@ class ComparisonFrame:
             win.title(title_str)
         except Exception:
             pass
+
+        # Ustaw jako okno podrzędne, aby zawsze było nad aplikacją, ale nie nad innymi programami
+        try:
+            win.transient(root)
+            win.lift(root)
+        except Exception:
+            pass
         win.attributes("-topmost", False)
 
         # Ramka i label na obraz
@@ -573,9 +570,35 @@ class ComparisonFrame:
         lbl = tk.Label(inner, image=imgtk, borderwidth=0, bg="white")
         lbl.pack()
 
+        # Wyśrodkuj okno na ekranie podobnie jak podgląd
+        try:
+            screen_w = root.winfo_screenwidth()
+            screen_h = root.winfo_screenheight()
+        except Exception:
+            screen_w, screen_h = 1280, 800
+        try:
+            window_w = zoom_w + 20
+            window_h = zoom_h + 20
+            center_x = (screen_w - window_w) // 2
+            center_y = (screen_h - window_h) // 2
+            win.geometry(f"{window_w}x{window_h}+{center_x}+{center_y}")
+        except Exception:
+            pass
+
         # Zachowaj referencję, aby obraz nie został zebrany przez GC
         win._imgtk = imgtk
         self.persistent_windows.append(win)
+
+        # Zablokuj możliwość zmiany rozmiaru okna kursorem
+        try:
+            win.resizable(False, False)
+            win.update_idletasks()
+            fixed_w = win.winfo_width()
+            fixed_h = win.winfo_height()
+            win.minsize(fixed_w, fixed_h)
+            win.maxsize(fixed_w, fixed_h)
+        except Exception:
+            pass
     
     def get_mask_visualization(self, method):
         """Tworzy wizualizację maski dla danej metody."""
@@ -719,6 +742,18 @@ class ComparisonFrame:
         try:
             comparison_frames.remove(self)
         except ValueError:
+            pass
+        # Zamknij okna trwałe powiązane z tą ramką
+        try:
+            for w in getattr(self, 'persistent_windows', []):
+                try:
+                    if w and w.winfo_exists():
+                        w.destroy()
+                except Exception:
+                    pass
+            if hasattr(self, 'persistent_windows'):
+                self.persistent_windows.clear()
+        except Exception:
             pass
         try:
             self.frame.destroy()
