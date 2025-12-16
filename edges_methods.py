@@ -43,6 +43,14 @@ def sobel_edges(channel, low_t=0, high_t=255):
     magnitude = np.clip(magnitude, low_t, high_t)
     return cv2.normalize(magnitude, None, 0, 255, cv2.NORM_MINMAX).astype(np.uint8)
 
+def sobel_cv2_edges(channel, low_t=0, high_t=255):
+    """Edge detection using cv2.Sobel (OpenCV implementation)."""
+    ch = channel.astype(np.float64)
+    grad_x = cv2.Sobel(ch, cv2.CV_64F, 1, 0, ksize=3)
+    grad_y = cv2.Sobel(ch, cv2.CV_64F, 0, 1, ksize=3)
+    magnitude = np.hypot(grad_x, grad_y)
+    magnitude = np.clip(magnitude, low_t, high_t)
+    return cv2.normalize(magnitude, None, 0, 255, cv2.NORM_MINMAX).astype(np.uint8)
 
 def laplacian_edges(channel, low_t=0, high_t=255):
     """Compatibility alias for the 4-neighbor Laplacian variant.

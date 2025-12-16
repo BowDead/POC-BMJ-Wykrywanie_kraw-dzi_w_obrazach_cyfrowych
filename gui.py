@@ -185,6 +185,7 @@ class ComparisonFrame:
         self.method_combo = ttk.Combobox(top, state="readonly", width=method_combo_width)
         self.method_combo['values'] = [
             'Sobel',
+            'Sobel CV2',
             'Laplacian 4-neighbor',
             'Laplacian 8-neighbor',
             'Laplacian LoG',
@@ -196,6 +197,11 @@ class ComparisonFrame:
         ]
         self.method_combo.current(0)
         self.method_combo.pack(side="left", padx=int(5 * max(1.0, scale_factor * 0.7)))
+        
+        # Tooltip dla maski metody
+        self.tooltip_window = None
+        self.method_combo.bind("<Enter>", self.show_mask_tooltip)
+        self.method_combo.bind("<Leave>", self.hide_mask_tooltip)
 
         # --- spinboxy progów filtrów ---
         self.low_threshold = tk.IntVar(value=0)
@@ -486,6 +492,143 @@ class ComparisonFrame:
         if self.preview_window:
             self.preview_window.destroy()
             self.preview_window = None
+    
+    def get_mask_visualization(self, method):
+        """Tworzy wizualizację maski dla danej metody."""
+        masks = {
+            'Sobel': [
+                (np.array([[-1, 0, 1], [-2, 0, 2], [-1, 0, 1]]), "Gx"),
+                (np.array([[-1, -2, -1], [0, 0, 0], [1, 2, 1]]), "Gy")
+            ],
+            'Sobel CV2': [
+                (np.array([[-1, 0, 1], [-2, 0, 2], [-1, 0, 1]]), "Gx"),
+                (np.array([[-1, -2, -1], [0, 0, 0], [1, 2, 1]]), "Gy")
+            ],
+            'Laplacian 4-neighbor': [
+                (np.array([[0, 1, 0], [1, -4, 1], [0, 1, 0]]), "4-neighbor")
+            ],
+            'Laplacian 8-neighbor': [
+                (np.array([[1, 1, 1], [1, -8, 1], [1, 1, 1]]), "8-neighbor")
+            ],
+            'Laplacian LoG': [
+                (np.array([[0, 0, -1, 0, 0], [0, -1, -2, -1, 0], [-1, -2, 16, -2, -1], 
+                          [0, -1, -2, -1, 0], [0, 0, -1, 0, 0]]), "LoG 5x5")
+            ],
+            'Scharr': [
+                (np.array([[-3, 0, 3], [-10, 0, 10], [-3, 0, 3]]), "Gx"),
+                (np.array([[-3, -10, -3], [0, 0, 0], [3, 10, 3]]), "Gy")
+            ],
+            'Prewitt': [
+                (np.array([[-1, 0, 1], [-1, 0, 1], [-1, 0, 1]]), "Gx"),
+                (np.array([[1, 1, 1], [0, 0, 0], [-1, -1, -1]]), "Gy")
+            ],
+            'Roberts': [
+                (np.array([[1, 0], [0, -1]]), "Gx"),
+                (np.array([[0, 1], [-1, 0]]), "Gy")
+            ],
+            'Canny': [
+                (np.array([[-1, 0, 1], [-2, 0, 2], [-1, 0, 1]]), "Sobel Gx"),
+                (np.array([[-1, -2, -1], [0, 0, 0], [1, 2, 1]]), "Sobel Gy")
+            ],
+            'Canny CV2': [
+                (np.array([[-1, 0, 1], [-2, 0, 2], [-1, 0, 1]]), "Sobel Gx"),
+                (np.array([[-1, -2, -1], [0, 0, 0], [1, 2, 1]]), "Sobel Gy")
+            ]
+        }
+        
+        return masks.get(method, [])
+    
+    def show_mask_tooltip(self, event):
+        """Pokazuje tooltip z wizualizacją maski."""
+        method = self.method_combo.get()
+        masks = self.get_mask_visualization(method)
+        
+        if not masks:
+            return
+        
+        # Ukryj stary tooltip jeśli istnieje
+        self.hide_mask_tooltip()
+        
+        # Stwórz okno tooltip
+        self.tooltip_window = tk.Toplevel()
+        self.tooltip_window.overrideredirect(True)
+        self.tooltip_window.attributes("-topmost", True)
+        
+        # Ramka z ciemnym obramowaniem
+        outer_frame = tk.Frame(self.tooltip_window, bg="black", bd=1)
+        outer_frame.pack(padx=1, pady=1)
+        
+        inner_frame = tk.Frame(outer_frame, bg="white", bd=3)
+        inner_frame.pack(padx=2, pady=2)
+        
+        # Tytuł
+        title_label = tk.Label(inner_frame, text=f"Maska: {method}", 
+                               font=("TkDefaultFont", int(10 * max(1.0, scale_factor * 0.8)), "bold"),
+                               bg="white")
+        title_label.pack(pady=(5, 10))
+        
+        # Dla każdej maski (Gx, Gy, etc.)
+        for mask_array, mask_name in masks:
+            mask_frame = tk.Frame(inner_frame, bg="white")
+            mask_frame.pack(pady=5)
+            
+            # Nazwa maski (Gx, Gy)
+            name_label = tk.Label(mask_frame, text=mask_name, 
+                                 font=("TkDefaultFont", int(9 * max(1.0, scale_factor * 0.8)), "bold"),
+                                 bg="white")
+            name_label.pack()
+            
+            # Wizualizacja maski
+            cell_size = 40
+            rows, cols = mask_array.shape
+            
+            canvas = tk.Canvas(mask_frame, width=cols * cell_size, height=rows * cell_size, 
+                             bg="white", highlightthickness=0)
+            canvas.pack(pady=5)
+            
+            # Normalizacja do kolorów
+            mask_min = mask_array.min()
+            mask_max = mask_array.max()
+            
+            for i in range(rows):
+                for j in range(cols):
+                    val = mask_array[i, j]
+                    
+                    # Kolor: czerwony dla ujemnych, zielony dla dodatnich, biały dla 0
+                    if val < 0:
+                        intensity = int(255 * abs(val - mask_min) / (abs(mask_min) + 1e-10))
+                        color = f"#{intensity:02x}{0:02x}{0:02x}"
+                    elif val > 0:
+                        intensity = int(255 * val / (mask_max + 1e-10))
+                        color = f"#{0:02x}{intensity:02x}{0:02x}"
+                    else:
+                        color = "#ffffff"
+                    
+                    x1, y1 = j * cell_size, i * cell_size
+                    x2, y2 = x1 + cell_size, y1 + cell_size
+                    
+                    # Rysuj komórkę
+                    canvas.create_rectangle(x1, y1, x2, y2, fill=color, outline="black", width=1)
+                    
+                    # Dodaj tekst z wartością
+                    text_color = "white" if abs(val) > (mask_max - mask_min) / 2 else "black"
+                    canvas.create_text((x1 + x2) / 2, (y1 + y2) / 2, 
+                                     text=str(int(val)) if val == int(val) else f"{val:.1f}",
+                                     font=("TkDefaultFont", int(11 * max(1.0, scale_factor * 0.8)), "bold"),
+                                     fill=text_color)
+        
+        # Pozycja tooltip
+        x = self.method_combo.winfo_rootx() + 10
+        y = self.method_combo.winfo_rooty() + self.method_combo.winfo_height() + 5
+        
+        self.tooltip_window.geometry(f"+{x}+{y}")
+        self.tooltip_window.update_idletasks()
+    
+    def hide_mask_tooltip(self, event=None):
+        """Ukrywa tooltip z maską."""
+        if self.tooltip_window:
+            self.tooltip_window.destroy()
+            self.tooltip_window = None
 
     def remove_self(self):
         """Usuwa tę instancję ComparisonFrame z listy i GUI."""
