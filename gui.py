@@ -60,6 +60,11 @@ TRANSLATIONS = {
         'CHANNEL_L': 'L', 'CHANNEL_A': 'A', 'CHANNEL_B': 'B',
         'CHANNEL_C': 'C', 'CHANNEL_M': 'M', 'CHANNEL_Y': 'Y', 'CHANNEL_K': 'K',
         'EDGE_SUM_TITLE': 'Suma krawędzi',
+        # Globalne ustawienia
+        'GLOBAL_COLOR_SPACE': 'Globalna przestrzeń barw',
+        'GLOBAL_METHOD': 'Globalna metoda',
+        'APPLY_COLOR_ALL': 'Zastosuj przestrzeń do wszystkich',
+        'APPLY_METHOD_ALL': 'Zastosuj metodę do wszystkich',
     },
     'en': {
         # Tytuł aplikacji
@@ -99,6 +104,11 @@ TRANSLATIONS = {
         'CHANNEL_L': 'L', 'CHANNEL_A': 'A', 'CHANNEL_B': 'B',
         'CHANNEL_C': 'C', 'CHANNEL_M': 'M', 'CHANNEL_Y': 'Y', 'CHANNEL_K': 'K',
         'EDGE_SUM_TITLE': 'Edge Sum',
+        # Global settings
+        'GLOBAL_COLOR_SPACE': 'Global color space',
+        'GLOBAL_METHOD': 'Global method',
+        'APPLY_COLOR_ALL': 'Apply color space to all',
+        'APPLY_METHOD_ALL': 'Apply method to all',
     }
 }
 
@@ -648,6 +658,12 @@ def add_comparison():
     comparison_frames.append(frame)
     if shared_image_pil is not None and shared_image_cv2 is not None:
         frame.set_shared_image(shared_image_pil, shared_image_cv2, shared_image_path)
+    # Ustaw domyślne wartości z globalnych comboboxów dla nowej ramki
+    try:
+        frame.color_space_combo.set(global_color_space_var.get())
+        frame.method_combo.set(global_method_var.get())
+    except Exception:
+        pass
     update_scroll_region()
 
 
@@ -705,6 +721,15 @@ def switch_language(lang):
     # Aktualizacja wszystkich instancji modułów
     for frame in comparison_frames:
         frame.update_texts()
+
+    # Aktualizacja globalnych etykiet i przycisków
+    try:
+        global_color_label.config(text=get_text('GLOBAL_COLOR_SPACE'))
+        global_method_label.config(text=get_text('GLOBAL_METHOD'))
+        apply_color_btn.config(text=get_text('APPLY_COLOR_ALL'))
+        apply_method_btn.config(text=get_text('APPLY_METHOD_ALL'))
+    except Exception:
+        pass
 
 
 # ===== Główne przyciski (Zmienione, aby umożliwić aktualizację tekstu) =====
@@ -790,6 +815,74 @@ def language_changed(event):
 
 lang_combo.bind('<<ComboboxSelected>>', language_changed)
 
+
+# ===== Globalne / domyślne ustawienia dla nowych kontenerów =====
+global_defaults_container = tk.Frame(root, pady=int(8 * max(1.0, scale_factor * 0.7)))
+global_defaults_container.pack(fill="x")
+
+# Górny rząd: etykiety + comboboxy
+globals_top = tk.Frame(global_defaults_container)
+globals_top.pack(fill="x")
+
+g_combo_width = int(10 * max(1.0, scale_factor * 0.6))
+g_method_combo_width = int(25 * max(1.0, scale_factor * 0.6))
+
+global_color_label = tk.Label(globals_top, text=get_text('GLOBAL_COLOR_SPACE'))
+global_color_label.pack(side="left", padx=int(8 * max(1.0, scale_factor * 0.7)))
+
+global_color_space_var = tk.StringVar(value='RGB')
+global_color_combo = ttk.Combobox(globals_top, state="readonly", width=g_combo_width,
+                                  textvariable=global_color_space_var)
+global_color_combo['values'] = ['RGB', 'HSV', 'LAB', 'CMYK']
+global_color_combo.pack(side="left", padx=int(5 * max(1.0, scale_factor * 0.7)))
+
+global_method_label = tk.Label(globals_top, text=get_text('GLOBAL_METHOD'))
+global_method_label.pack(side="left", padx=int(15 * max(1.0, scale_factor * 0.7)))
+
+global_method_var = tk.StringVar(value='Sobel')
+global_method_combo = ttk.Combobox(globals_top, state="readonly", width=g_method_combo_width,
+                                   textvariable=global_method_var)
+global_method_combo['values'] = [
+    'Sobel',
+    'Sobel CV2',
+    'Laplacian 4-neighbor',
+    'Laplacian 8-neighbor',
+    'Laplacian LoG',
+    'Scharr',
+    'Prewitt',
+    'Canny',
+    'Canny CV2',
+    'Roberts'
+]
+global_method_combo.pack(side="left", padx=int(5 * max(1.0, scale_factor * 0.7)))
+
+# Dolny rząd: przyciski Zastosuj do wszystkich
+globals_buttons = tk.Frame(global_defaults_container)
+globals_buttons.pack(fill="x", pady=int(5 * max(1.0, scale_factor * 0.7)))
+
+def apply_global_color_to_all():
+    val = global_color_space_var.get()
+    for frame in comparison_frames:
+        try:
+            frame.color_space_combo.set(val)
+        except Exception:
+            pass
+
+def apply_global_method_to_all():
+    val = global_method_var.get()
+    for frame in comparison_frames:
+        try:
+            frame.method_combo.set(val)
+        except Exception:
+            pass
+
+apply_color_btn = tk.Button(globals_buttons, text=get_text('APPLY_COLOR_ALL'), command=apply_global_color_to_all)
+apply_color_btn.pack(side="left", padx=int(8 * max(1.0, scale_factor * 0.7)))
+
+apply_method_btn = tk.Button(globals_buttons, text=get_text('APPLY_METHOD_ALL'), command=apply_global_method_to_all)
+apply_method_btn.pack(side="left", padx=int(8 * max(1.0, scale_factor * 0.7)))
+
+# Podpowiedź: nowe ramki będą używać wybranych ustawień jako domyślne
 
 # ===== Sekcja przewijana =====
 scroll_container = tk.Frame(root)
