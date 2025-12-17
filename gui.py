@@ -718,11 +718,14 @@ class ComparisonFrame:
                     if val < 0:
                         intensity = int(255 * abs(val - mask_min) / (abs(mask_min) + 1e-10))
                         color = f"#{intensity:02x}{0:02x}{0:02x}"
+                        text_color = "white"
                     elif val > 0:
                         intensity = int(255 * val / (mask_max + 1e-10))
                         color = f"#{0:02x}{intensity:02x}{0:02x}"
+                        text_color = "white"
                     else:
                         color = "#ffffff"
+                        text_color = "black"
                     
                     x1, y1 = j * cell_size, i * cell_size
                     x2, y2 = x1 + cell_size, y1 + cell_size
@@ -731,7 +734,6 @@ class ComparisonFrame:
                     canvas.create_rectangle(x1, y1, x2, y2, fill=color, outline="black", width=1)
                     
                     # Dodaj tekst z wartością
-                    text_color = "white" if abs(val) > (mask_max - mask_min) / 2 else "black"
                     canvas.create_text((x1 + x2) / 2, (y1 + y2) / 2, 
                                      text=str(int(val)) if val == int(val) else f"{val:.1f}",
                                      font=("TkDefaultFont", int(11 * max(1.0, scale_factor * 0.8)), "bold"),
