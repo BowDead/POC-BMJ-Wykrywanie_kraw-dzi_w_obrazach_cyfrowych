@@ -8,12 +8,16 @@ import ctypes
 
 from edges_detection import detect_edges
 
-# Włączenie świadomości DPI dla Windows
+# Wyłączenie skalowania DPI dla Tkinter - tekst będzie tego samego rozmiaru niezależnie od skali Windows
+# Zamiast SetProcessDpiAwareness (które powoduje problemy ze skalą), używamy trybu nieskalowanego
 try:
-    ctypes.windll.shcore.SetProcessDpiAwareness(1)  # PROCESS_SYSTEM_DPI_AWARE
+    # DPI_AWARENESS_CONTEXT_UNAWARE = -1
+    # To wymusi, aby Windows nie skalował aplikacji
+    ctypes.windll.shcore.SetProcessDpiAwarenessContext(-1)
 except:
+    # Jeśli powyższe nie działa, spróbuj starszej metody
     try:
-        ctypes.windll.user32.SetProcessDPIAware()
+        ctypes.windll.shcore.SetProcessDpiAwareness(0)  # PROCESS_DPI_UNAWARE
     except:
         pass
 
@@ -122,21 +126,20 @@ def get_text(key):
 root = tk.Tk()
 root.title(get_text('APP_TITLE')) # Zmiana
 
-# Pobranie rozdzielczości ekranu i ustalenie skali
+# Pobranie rozdzielczości ekranu
 screen_width = root.winfo_screenwidth()
 screen_height = root.winfo_screenheight()
 
-# Obliczenie skali DPI
-dpi = root.winfo_fpixels('1i')
-scale_factor = dpi / 96.0  # 96 DPI to standard
+# Brak skalowania - wszystko będzie tego samego rozmiaru niezależnie od ustawień DPI Windows
+scale_factor = 1.0
 
-# Rozmiar canvas dostosowany do skali
-CANVAS_SIZE = int(200 * max(1.0, scale_factor * 0.7))  # Zwiększamy bazowy rozmiar dla wysokiego DPI
+# Stały rozmiar canvas - niezależnie od skali Windows
+CANVAS_SIZE = 200
 
-# Ustawienie czcionek skalowanych
-default_font_size = int(9 * max(1.0, scale_factor * 0.8))
-button_font_size = int(9 * max(1.0, scale_factor * 0.8))
-label_font_size = int(8 * max(1.0, scale_factor * 0.8))
+# Ustawienie czcionek w stałym rozmiarze - niezależnie od skali Windows
+default_font_size = 9
+button_font_size = 9
+label_font_size = 8
 
 root.option_add('*Font', f'TkDefaultFont {default_font_size}')
 root.option_add('*Button.Font', f'TkDefaultFont {button_font_size}')
@@ -670,7 +673,7 @@ class ComparisonFrame:
         
         # Tytuł
         title_label = tk.Label(inner_frame, text=f"Maska: {method}", 
-                               font=("TkDefaultFont", int(10 * max(1.0, scale_factor * 0.8)), "bold"),
+                               font=("TkDefaultFont", 10, "bold"),
                                bg="white")
         title_label.pack(pady=(5, 10))
         
@@ -681,7 +684,7 @@ class ComparisonFrame:
             
             # Nazwa maski (Gx, Gy)
             name_label = tk.Label(mask_frame, text=mask_name, 
-                                 font=("TkDefaultFont", int(9 * max(1.0, scale_factor * 0.8)), "bold"),
+                                 font=("TkDefaultFont", 9, "bold"),
                                  bg="white")
             name_label.pack()
             
@@ -723,7 +726,7 @@ class ComparisonFrame:
                     # Dodaj tekst z wartością
                     canvas.create_text((x1 + x2) / 2, (y1 + y2) / 2, 
                                      text=str(int(val)) if val == int(val) else f"{val:.1f}",
-                                     font=("TkDefaultFont", int(11 * max(1.0, scale_factor * 0.8)), "bold"),
+                                     font=("TkDefaultFont", 8, "bold"),
                                      fill=text_color)
         
         # Pozycja tooltip
