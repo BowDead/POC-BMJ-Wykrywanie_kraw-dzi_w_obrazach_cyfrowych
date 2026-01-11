@@ -69,6 +69,8 @@ TRANSLATIONS = {
         'GLOBAL_METHOD': 'Globalna metoda',
         'APPLY_COLOR_ALL': 'Zastosuj przestrzeń do wszystkich',
         'APPLY_METHOD_ALL': 'Zastosuj metodę do wszystkich',
+        # Menu masek
+        'MASK': 'Maska'
     },
     'en': {
         # Tytuł aplikacji
@@ -113,6 +115,8 @@ TRANSLATIONS = {
         'GLOBAL_METHOD': 'Global method',
         'APPLY_COLOR_ALL': 'Apply color space to all',
         'APPLY_METHOD_ALL': 'Apply method to all',
+        # Mask menu 
+        'MASK': 'Mask'
     }
 }
 
@@ -188,6 +192,7 @@ class ComparisonFrame:
         self.tk_images = []
         self.pil_images = []
         self.persistent_windows = []
+        self.channel_keys = []
 
         # --- główny frame ---
         pady_val = int(10 * scale_factor)
@@ -335,12 +340,16 @@ class ComparisonFrame:
         for i in range(1, len(self.label_list)):
             label = self.label_list[i]
             btn = self.save_buttons[i]
+    
+            # Jeśli to suma
             if "Suma" in label.cget("text") or "Sum" in label.cget("text"):
                 label.config(text=get_text('EDGE_SUM'))
             else:
-                # Wymaga ponownego uruchomienia run_function dla poprawnych nazw kanałów.
-                # Tymczasowo, przy zmianie języka, etykieta pozostanie w starym języku + nowy język kanału.
-                pass
+                # Używamy zapisanych kluczy kanałów
+                if i-1 < len(self.channel_keys):
+                    channel_key = self.channel_keys[i-1]
+                    label.config(text=f"{get_text('EDGE')} {get_text(channel_key)}")
+
 
         for btn in self.save_buttons:
             btn.config(text=get_text('SAVE'))
@@ -434,8 +443,9 @@ class ComparisonFrame:
 
             # Najpierw twórz dynamiczne canvas
             for i in range(len(channel_titles)):
-                # titles[i] to już przetłumaczona nazwa kanału (np. 'R' lub 'H')
-                self._create_canvas_block(f"{get_text('EDGE')} {channel_titles[i]}") # Zmiana
+                channel_key = channel_titles[i]  # np. 'CHANNEL_R', 'CHANNEL_G', etc.
+                self._create_canvas_block(f"{get_text('EDGE')} {channel_titles[i]}")
+                self.channel_keys.append(channel_key)
 
             # teraz uzupełnij obrazami
             for i, e in enumerate(edges):
@@ -684,7 +694,7 @@ class ComparisonFrame:
         inner_frame.pack(padx=2, pady=2)
         
         # Tytuł
-        title_label = tk.Label(inner_frame, text=f"Maska: {method}", 
+        title_label = tk.Label(inner_frame, text=get_text('MASK')+f": {method}", 
                                font=("TkDefaultFont", 10, "bold"),
                                bg="white")
         title_label.pack(pady=(5, 10))
