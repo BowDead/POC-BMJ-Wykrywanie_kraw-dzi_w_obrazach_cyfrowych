@@ -67,8 +67,15 @@ TRANSLATIONS = {
         # Globalne ustawienia
         'GLOBAL_COLOR_SPACE': 'Globalna przestrzeń barw',
         'GLOBAL_METHOD': 'Globalna metoda',
+        'GLOBAL_THRESHOLD': 'Globalny próg',
+        'GLOBAL_BINARY': 'Globalna binaryzacja',
+        'GLOBAL_OPTIONS': 'Opcje globalne',
+        'LOW_THRESHOLD': 'Niski próg:',
+        'HIGH_THRESHOLD': 'Wysoki próg:',
         'APPLY_COLOR_ALL': 'Zastosuj przestrzeń do wszystkich',
         'APPLY_METHOD_ALL': 'Zastosuj metodę do wszystkich',
+        'APPLY_THRESHOLD_ALL': 'Zastosuj próg do wszystkich',
+        'APPLY_BINARY_ALL': 'Zastosuj binaryzację do wszystkich',
         # Menu masek
         'MASK': 'Maska'
     },
@@ -113,8 +120,15 @@ TRANSLATIONS = {
         # Global settings
         'GLOBAL_COLOR_SPACE': 'Global color space',
         'GLOBAL_METHOD': 'Global method',
+        'GLOBAL_THRESHOLD': 'Global threshold',
+        'GLOBAL_BINARY': 'Global binarization',
+        'GLOBAL_OPTIONS': 'Global options',
+        'LOW_THRESHOLD': 'Low T:',
+        'HIGH_THRESHOLD': 'High T:',
         'APPLY_COLOR_ALL': 'Apply color space to all',
         'APPLY_METHOD_ALL': 'Apply method to all',
+        'APPLY_THRESHOLD_ALL': 'Apply threshold to all',
+        'APPLY_BINARY_ALL': 'Apply binarization to all',
         # Mask menu 
         'MASK': 'Mask'
     }
@@ -798,6 +812,9 @@ def add_comparison():
     try:
         frame.color_space_combo.set(global_color_space_var.get())
         frame.method_combo.set(global_method_var.get())
+        frame.low_threshold.set(global_low_threshold_var.get())
+        frame.high_threshold.set(global_high_threshold_var.get())
+        frame.binary_var.set(global_binary_var.get())
     except Exception:
         pass
     update_scroll_region()
@@ -838,6 +855,7 @@ def switch_language(lang):
     add_btn.config(text=get_text('ADD_FRAME'))
     choose_img_btn.config(text=get_text('CHOOSE_IMAGE'))
     run_all_btn.config(text=get_text('RUN_FUNCTION'))
+    global_options_label.config(text=get_text('GLOBAL_OPTIONS'))
     lang_label.config(text=get_text('LANGUAGE'))
 
     # Aktualizacja Comboboxa języków
@@ -862,8 +880,15 @@ def switch_language(lang):
     try:
         global_color_label.config(text=get_text('GLOBAL_COLOR_SPACE'))
         global_method_label.config(text=get_text('GLOBAL_METHOD'))
+        global_threshold_label.config(text=get_text('GLOBAL_THRESHOLD'))
+        global_binary_label.config(text=get_text('GLOBAL_BINARY'))
+        global_low_threshold_label.config(text=get_text('LOW_THRESHOLD'))
+        global_high_threshold_label.config(text=get_text('HIGH_THRESHOLD'))
         apply_color_btn.config(text=get_text('APPLY_COLOR_ALL'))
         apply_method_btn.config(text=get_text('APPLY_METHOD_ALL'))
+        apply_threshold_btn.config(text=get_text('APPLY_THRESHOLD_ALL'))
+        apply_binary_btn.config(text=get_text('APPLY_BINARY_ALL'))
+        global_binary_check.config(text=get_text('BINARYZATION'))
     except Exception:
         pass
 
@@ -922,6 +947,24 @@ run_all_btn.pack(side="left", padx=int(10 * scale_factor))
 image_status_label = tk.Label(main_controls, text=get_text('IMAGE_NOT_LOADED'), fg="gray") # Zmiana
 image_status_label.pack(side="left", padx=int(10 * scale_factor))
 
+# Przycisk rozwijania/zwijania opcji globalnych
+global_options_visible = tk.BooleanVar(value=True)
+
+def toggle_global_options():
+    if global_options_visible.get():
+        global_options_frame.pack_forget()
+        toggle_global_btn.config(text="▼")
+        global_options_visible.set(False)
+    else:
+        global_options_frame.pack(fill="x", pady=int(5 * scale_factor), padx=int(10 * scale_factor), before=scroll_container)
+        toggle_global_btn.config(text="▲")
+        global_options_visible.set(True)
+
+toggle_global_btn = tk.Button(main_controls, text="▲", width=3, command=toggle_global_options)
+toggle_global_btn.pack(side="left", padx=int(10 * scale_factor))
+
+global_options_label = tk.Label(main_controls, text=get_text('GLOBAL_OPTIONS'))
+global_options_label.pack(side="left", padx=int(5 * scale_factor))
 
 # Przełącznik języka (Dodany ponownie)
 lang_frame = tk.Frame(main_controls)
@@ -953,48 +996,12 @@ lang_combo.bind('<<ComboboxSelected>>', language_changed)
 
 
 # ===== Globalne / domyślne ustawienia dla nowych kontenerów =====
-global_defaults_container = tk.Frame(root, pady=int(8 * scale_factor))
-global_defaults_container.pack(fill="x")
-
-# Górny rząd: etykiety + comboboxy
-globals_top = tk.Frame(global_defaults_container)
-globals_top.pack(fill="x")
+# Kontener na wszystkie opcje globalne (można schować)
+global_options_frame = tk.Frame(root, pady=int(8 * scale_factor), padx=int(10 * scale_factor), bd=2, relief="groove", bg="#f0f0f0")
+global_options_frame.pack(fill="x", pady=int(5 * scale_factor), padx=int(10 * scale_factor))
 
 g_combo_width = int(10 * scale_factor)
 g_method_combo_width = int(25 * scale_factor)
-
-global_color_label = tk.Label(globals_top, text=get_text('GLOBAL_COLOR_SPACE'))
-global_color_label.pack(side="left", padx=int(8 * scale_factor))
-
-global_color_space_var = tk.StringVar(value='RGB')
-global_color_combo = ttk.Combobox(globals_top, state="readonly", width=g_combo_width,
-                                  textvariable=global_color_space_var)
-global_color_combo['values'] = ['RGB', 'HSV', 'LAB', 'CMYK']
-global_color_combo.pack(side="left", padx=int(5 * scale_factor))
-
-global_method_label = tk.Label(globals_top, text=get_text('GLOBAL_METHOD'))
-global_method_label.pack(side="left", padx=int(15 * scale_factor))
-
-global_method_var = tk.StringVar(value='Sobel')
-global_method_combo = ttk.Combobox(globals_top, state="readonly", width=g_method_combo_width,
-                                   textvariable=global_method_var)
-global_method_combo['values'] = [
-    'Sobel',
-    'Sobel CV2',
-    'Laplacian 4-neighbor',
-    'Laplacian 8-neighbor',
-    'Laplacian LoG',
-    'Scharr',
-    'Prewitt',
-    'Canny',
-    'Canny CV2',
-    'Roberts'
-]
-global_method_combo.pack(side="left", padx=int(5 * scale_factor))
-
-# Dolny rząd: przyciski Zastosuj do wszystkich
-globals_buttons = tk.Frame(global_defaults_container)
-globals_buttons.pack(fill="x", pady=int(5 * scale_factor))
 
 def apply_global_color_to_all():
     val = global_color_space_var.get()
@@ -1012,11 +1019,105 @@ def apply_global_method_to_all():
         except Exception:
             pass
 
-apply_color_btn = tk.Button(globals_buttons, text=get_text('APPLY_COLOR_ALL'), command=apply_global_color_to_all)
+# Pierwszy rząd: przestrzeń barw
+color_space_row = tk.Frame(global_options_frame)
+color_space_row.pack(fill="x", pady=int(3 * scale_factor))
+
+global_color_label = tk.Label(color_space_row, text=get_text('GLOBAL_COLOR_SPACE'))
+global_color_label.pack(side="left", padx=int(8 * scale_factor))
+
+global_color_space_var = tk.StringVar(value='RGB')
+global_color_combo = ttk.Combobox(color_space_row, state="readonly", width=g_combo_width,
+                                  textvariable=global_color_space_var)
+global_color_combo['values'] = ['RGB', 'HSV', 'LAB', 'CMYK']
+global_color_combo.pack(side="left", padx=int(5 * scale_factor))
+
+apply_color_btn = tk.Button(color_space_row, text=get_text('APPLY_COLOR_ALL'), command=apply_global_color_to_all)
 apply_color_btn.pack(side="left", padx=int(8 * scale_factor))
 
-apply_method_btn = tk.Button(globals_buttons, text=get_text('APPLY_METHOD_ALL'), command=apply_global_method_to_all)
+# Drugi rząd: metoda
+method_row = tk.Frame(global_options_frame)
+method_row.pack(fill="x", pady=int(3 * scale_factor))
+
+global_method_label = tk.Label(method_row, text=get_text('GLOBAL_METHOD'))
+global_method_label.pack(side="left", padx=int(8 * scale_factor))
+
+global_method_var = tk.StringVar(value='Sobel')
+global_method_combo = ttk.Combobox(method_row, state="readonly", width=g_method_combo_width,
+                                   textvariable=global_method_var)
+global_method_combo['values'] = [
+    'Sobel',
+    'Sobel CV2',
+    'Laplacian 4-neighbor',
+    'Laplacian 8-neighbor',
+    'Laplacian LoG',
+    'Scharr',
+    'Prewitt',
+    'Canny',
+    'Canny CV2',
+    'Roberts'
+]
+global_method_combo.pack(side="left", padx=int(5 * scale_factor))
+
+apply_method_btn = tk.Button(method_row, text=get_text('APPLY_METHOD_ALL'), command=apply_global_method_to_all)
 apply_method_btn.pack(side="left", padx=int(8 * scale_factor))
+
+# Trzeci rząd: próg (threshold)
+threshold_row = tk.Frame(global_options_frame)
+threshold_row.pack(fill="x", pady=int(3 * scale_factor))
+
+global_threshold_label = tk.Label(threshold_row, text=get_text('GLOBAL_THRESHOLD'))
+global_threshold_label.pack(side="left", padx=int(8 * scale_factor))
+
+spinbox_width = int(5 * scale_factor)
+padx_small = int(3 * scale_factor)
+
+global_low_threshold_label = tk.Label(threshold_row, text=get_text('LOW_THRESHOLD'))
+global_low_threshold_label.pack(side="left", padx=padx_small)
+global_low_threshold_var = tk.IntVar(value=0)
+global_low_spin = tk.Spinbox(threshold_row, from_=0, to=255, width=spinbox_width, textvariable=global_low_threshold_var)
+global_low_spin.pack(side="left", padx=padx_small)
+
+global_high_threshold_label = tk.Label(threshold_row, text=get_text('HIGH_THRESHOLD'))
+global_high_threshold_label.pack(side="left", padx=padx_small)
+global_high_threshold_var = tk.IntVar(value=255)
+global_high_spin = tk.Spinbox(threshold_row, from_=1, to=255, width=spinbox_width, textvariable=global_high_threshold_var)
+global_high_spin.pack(side="left", padx=padx_small)
+
+def apply_global_threshold_to_all():
+    low_val = global_low_threshold_var.get()
+    high_val = global_high_threshold_var.get()
+    for frame in comparison_frames:
+        try:
+            frame.low_threshold.set(low_val)
+            frame.high_threshold.set(high_val)
+        except Exception:
+            pass
+
+apply_threshold_btn = tk.Button(threshold_row, text=get_text('APPLY_THRESHOLD_ALL'), command=apply_global_threshold_to_all)
+apply_threshold_btn.pack(side="left", padx=int(8 * scale_factor))
+
+# Czwarty rząd: binaryzacja
+binary_row = tk.Frame(global_options_frame)
+binary_row.pack(fill="x", pady=int(3 * scale_factor))
+
+global_binary_label = tk.Label(binary_row, text=get_text('GLOBAL_BINARY'))
+global_binary_label.pack(side="left", padx=int(8 * scale_factor))
+
+global_binary_var = tk.BooleanVar(value=False)
+global_binary_check = tk.Checkbutton(binary_row, text=get_text('BINARYZATION'), variable=global_binary_var)
+global_binary_check.pack(side="left", padx=int(5 * scale_factor))
+
+def apply_global_binary_to_all():
+    val = global_binary_var.get()
+    for frame in comparison_frames:
+        try:
+            frame.binary_var.set(val)
+        except Exception:
+            pass
+
+apply_binary_btn = tk.Button(binary_row, text=get_text('APPLY_BINARY_ALL'), command=apply_global_binary_to_all)
+apply_binary_btn.pack(side="left", padx=int(8 * scale_factor))
 
 # Podpowiedź: nowe ramki będą używać wybranych ustawień jako domyślne
 
