@@ -8,6 +8,16 @@ import ctypes
 
 from edges_detection import detect_edges
 
+import sys 
+
+def get_exe_dir():
+    """Zwraca folder, w którym leży aktualnie uruchomiony .exe (lub skrypt .py)"""
+    if getattr(sys, 'frozen', False):
+        # Program uruchomiony jako .exe (PyInstaller)
+        return os.path.dirname(sys.executable)
+    else:
+        # Program uruchomiony jako zwykły .py
+        return os.path.dirname(os.path.abspath(__file__))
 # Wyłączenie skalowania DPI dla Tkinter - tekst będzie tego samego rozmiaru niezależnie od skali Windows
 # Zamiast SetProcessDpiAwareness (które powoduje problemy ze skalą), używamy trybu nieskalowanego
 try:
