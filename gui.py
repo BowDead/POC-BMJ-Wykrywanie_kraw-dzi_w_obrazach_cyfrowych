@@ -8,25 +8,16 @@ import ctypes
 
 from edges_detection import detect_edges
 
-import sys
-
-def get_exe_dir():
-    """Zwraca folder, w którym leży aktualnie uruchomiony .exe (lub skrypt .py)"""
-    if getattr(sys, 'frozen', False):
-        # Program uruchomiony jako .exe (PyInstaller)
-        return os.path.dirname(sys.executable)
-    else:
-        # Program uruchomiony jako zwykły .py
-        return os.path.dirname(os.path.abspath(__file__))
-
-
-
-# Włączenie świadomości DPI dla Windows
+# Wyłączenie skalowania DPI dla Tkinter - tekst będzie tego samego rozmiaru niezależnie od skali Windows
+# Zamiast SetProcessDpiAwareness (które powoduje problemy ze skalą), używamy trybu nieskalowanego
 try:
-    ctypes.windll.shcore.SetProcessDpiAwareness(1)  # PROCESS_SYSTEM_DPI_AWARE
+    # DPI_AWARENESS_CONTEXT_UNAWARE = -1
+    # To wymusi, aby Windows nie skalował aplikacji
+    ctypes.windll.shcore.SetProcessDpiAwarenessContext(-1)
 except:
+    # Jeśli powyższe nie działa, spróbuj starszej metody
     try:
-        ctypes.windll.user32.SetProcessDPIAware()
+        ctypes.windll.shcore.SetProcessDpiAwareness(0)  # PROCESS_DPI_UNAWARE
     except:
         pass
 
@@ -76,8 +67,17 @@ TRANSLATIONS = {
         # Globalne ustawienia
         'GLOBAL_COLOR_SPACE': 'Globalna przestrzeń barw',
         'GLOBAL_METHOD': 'Globalna metoda',
+        'GLOBAL_THRESHOLD': 'Globalny próg',
+        'GLOBAL_BINARY': 'Globalna binaryzacja',
+        'GLOBAL_OPTIONS': 'Opcje globalne',
+        'LOW_THRESHOLD': 'Niski próg:',
+        'HIGH_THRESHOLD': 'Wysoki próg:',
         'APPLY_COLOR_ALL': 'Zastosuj przestrzeń do wszystkich',
         'APPLY_METHOD_ALL': 'Zastosuj metodę do wszystkich',
+        'APPLY_THRESHOLD_ALL': 'Zastosuj próg do wszystkich',
+        'APPLY_BINARY_ALL': 'Zastosuj binaryzację do wszystkich',
+        # Menu masek
+        'MASK': 'Maska'
     },
     'en': {
         # Tytuł aplikacji
@@ -120,8 +120,17 @@ TRANSLATIONS = {
         # Global settings
         'GLOBAL_COLOR_SPACE': 'Global color space',
         'GLOBAL_METHOD': 'Global method',
+        'GLOBAL_THRESHOLD': 'Global threshold',
+        'GLOBAL_BINARY': 'Global binarization',
+        'GLOBAL_OPTIONS': 'Global options',
+        'LOW_THRESHOLD': 'Low T:',
+        'HIGH_THRESHOLD': 'High T:',
         'APPLY_COLOR_ALL': 'Apply color space to all',
         'APPLY_METHOD_ALL': 'Apply method to all',
+        'APPLY_THRESHOLD_ALL': 'Apply threshold to all',
+        'APPLY_BINARY_ALL': 'Apply binarization to all',
+        # Mask menu 
+        'MASK': 'Mask'
     }
 }
 
@@ -135,21 +144,30 @@ def get_text(key):
 root = tk.Tk()
 root.title(get_text('APP_TITLE')) # Zmiana
 
-# Pobranie rozdzielczości ekranu i ustalenie skali
 screen_width = root.winfo_screenwidth()
 screen_height = root.winfo_screenheight()
+print(screen_height, screen_width)
+# Wspólny faktor skalowania GUI
+scale_factor = min(screen_width / 1280, screen_height / 768)
 
-# Obliczenie skali DPI
-dpi = root.winfo_fpixels('1i')
-scale_factor = dpi / 96.0  # 96 DPI to standard
 
-# Rozmiar canvas dostosowany do skali
-CANVAS_SIZE = int(200 * max(1.0, scale_factor * 0.7))  # Zwiększamy bazowy rozmiar dla wysokiego DPI
+# Pobranie skali DPI Windows
+try:
+    user32 = ctypes.windll.user32
+    user32.SetProcessDPIAware()
+    dpi_scale = user32.GetDpiForWindow(root.winfo_id()) / 96
+except Exception:
+    dpi_scale = 1.0
 
-# Ustawienie czcionek skalowanych
-default_font_size = int(9 * max(1.0, scale_factor * 0.8))
-button_font_size = int(9 * max(1.0, scale_factor * 0.8))
-label_font_size = int(8 * max(1.0, scale_factor * 0.8))
+
+CANVAS_SIZE = int(200 * scale_factor)  # bazowo 200 px przy FullHD
+
+
+# Ustawienie czcionek w stałym rozmiarze - niezależnie od skali Windows
+default_font_size = int(15 * scale_factor)
+button_font_size = int(15 * scale_factor)
+label_font_size = int(13 * scale_factor)
+
 
 root.option_add('*Font', f'TkDefaultFont {default_font_size}')
 root.option_add('*Button.Font', f'TkDefaultFont {button_font_size}')
@@ -188,24 +206,27 @@ class ComparisonFrame:
         self.tk_images = []
         self.pil_images = []
         self.persistent_windows = []
+        self.channel_keys = []
 
         # --- główny frame ---
-        pady_val = int(10 * max(1.0, scale_factor * 0.7))
-        padx_val = int(10 * max(1.0, scale_factor * 0.7))
+        pady_val = int(10 * scale_factor)
+        padx_val = int(10 * scale_factor)
+
+
         self.frame = tk.Frame(parent, pady=pady_val, padx=padx_val, bd=2, relief="groove")
-        self.frame.pack(side="top", fill="x", padx=padx_val, pady=int(5 * max(1.0, scale_factor * 0.7)))
+        self.frame.pack(side="top", fill="x", padx=padx_val, pady=int(5 * scale_factor))
 
         # --- pasek górny ---
         top = tk.Frame(self.frame)
-        top.pack(fill="x", pady=int(5 * max(1.0, scale_factor * 0.7)))
+        top.pack(fill="x", pady=int(5 * scale_factor))
 
-        combo_width = int(10 * max(1.0, scale_factor * 0.6))
+        combo_width = int(10 * scale_factor)
         self.color_space_combo = ttk.Combobox(top, state="readonly", width=combo_width)
         self.color_space_combo['values'] = ['RGB', 'HSV', 'LAB', 'CMYK']
         self.color_space_combo.current(0)
-        self.color_space_combo.pack(side="left", padx=int(5 * max(1.0, scale_factor * 0.7)))
+        self.color_space_combo.pack(side="left", padx=int(5 * scale_factor))
 
-        method_combo_width = int(25 * max(1.0, scale_factor * 0.6))
+        method_combo_width = int(25 * scale_factor)
         self.method_combo = ttk.Combobox(top, state="readonly", width=method_combo_width)
         self.method_combo['values'] = [
             'Sobel',
@@ -220,7 +241,7 @@ class ComparisonFrame:
             'Roberts'
         ]
         self.method_combo.current(0)
-        self.method_combo.pack(side="left", padx=int(5 * max(1.0, scale_factor * 0.7)))
+        self.method_combo.pack(side="left", padx=int(5 * scale_factor))
         
         # Tooltip dla maski metody
         self.tooltip_window = None
@@ -231,9 +252,9 @@ class ComparisonFrame:
         self.low_threshold = tk.IntVar(value=0)
         self.high_threshold = tk.IntVar(value=255)
 
-        spinbox_width = int(5 * max(1.0, scale_factor * 0.7))
-        padx_small = int(3 * max(1.0, scale_factor * 0.7))
-        padx_medium = int(10 * max(1.0, scale_factor * 0.7))
+        spinbox_width = int(5 * scale_factor)
+        padx_small = int(3 * scale_factor)
+        padx_medium = int(10 * scale_factor)
         
         tk.Label(top, text="Low T:").pack(side="left", padx=padx_small)
         self.low_spin = tk.Spinbox(top, from_=0, to=255, width=spinbox_width, textvariable=self.low_threshold)
@@ -251,9 +272,9 @@ class ComparisonFrame:
         self.binary_check.pack(side="left", padx=padx_medium)
         
         # Przycisk usuwania tej ramki (minus na ramce)
-        btn_width = int(3 * max(1.0, scale_factor * 0.7))
+        btn_width = int(3 * scale_factor)
         self.remove_btn = tk.Button(top, text=get_text('REMOVE_FRAME'), width=btn_width, command=self.remove_self)
-        self.remove_btn.pack(side="right", padx=int(5 * max(1.0, scale_factor * 0.7)))
+        self.remove_btn.pack(side="right", padx=int(5 * scale_factor))
         
 
         # --- obszar na obrazy ---
@@ -271,7 +292,7 @@ class ComparisonFrame:
 
     def _create_canvas_block(self, title):
         subframe = tk.Frame(self.canvas_frame)
-        subframe.pack(side="left", padx=int(5 * max(1.0, scale_factor * 0.7)), anchor="w")
+        subframe.pack(side="left", padx=int(5 * scale_factor), anchor="w")
 
         canvas = tk.Canvas(subframe, width=CANVAS_SIZE, height=CANVAS_SIZE, bg="#ddd")
         canvas.pack()
@@ -299,7 +320,7 @@ class ComparisonFrame:
             text=get_text('SAVE'), # Zmiana
             command=lambda idx=len(self.canvas_list): self.save_image(idx)
         )
-        save_btn.pack(pady=int(3 * max(1.0, scale_factor * 0.7)))
+        save_btn.pack(pady=int(3 * scale_factor))
 
         self.canvas_list.append(canvas)
         self.label_list.append(label)
@@ -333,12 +354,16 @@ class ComparisonFrame:
         for i in range(1, len(self.label_list)):
             label = self.label_list[i]
             btn = self.save_buttons[i]
+    
+            # Jeśli to suma
             if "Suma" in label.cget("text") or "Sum" in label.cget("text"):
                 label.config(text=get_text('EDGE_SUM'))
             else:
-                # Wymaga ponownego uruchomienia run_function dla poprawnych nazw kanałów.
-                # Tymczasowo, przy zmianie języka, etykieta pozostanie w starym języku + nowy język kanału.
-                pass
+                # Używamy zapisanych kluczy kanałów
+                if i-1 < len(self.channel_keys):
+                    channel_key = self.channel_keys[i-1]
+                    label.config(text=f"{get_text('EDGE')} {get_text(channel_key)}")
+
 
         for btn in self.save_buttons:
             btn.config(text=get_text('SAVE'))
@@ -432,8 +457,9 @@ class ComparisonFrame:
 
             # Najpierw twórz dynamiczne canvas
             for i in range(len(channel_titles)):
-                # titles[i] to już przetłumaczona nazwa kanału (np. 'R' lub 'H')
-                self._create_canvas_block(f"{get_text('EDGE')} {channel_titles[i]}") # Zmiana
+                channel_key = channel_titles[i]  # np. 'CHANNEL_R', 'CHANNEL_G', etc.
+                self._create_canvas_block(f"{get_text('EDGE')} {channel_titles[i]}")
+                self.channel_keys.append(channel_key)
 
             # teraz uzupełnij obrazami
             for i, e in enumerate(edges):
@@ -682,8 +708,8 @@ class ComparisonFrame:
         inner_frame.pack(padx=2, pady=2)
         
         # Tytuł
-        title_label = tk.Label(inner_frame, text=f"Maska: {method}", 
-                               font=("TkDefaultFont", int(10 * max(1.0, scale_factor * 0.8)), "bold"),
+        title_label = tk.Label(inner_frame, text=get_text('MASK')+f": {method}", 
+                               font=("TkDefaultFont", 10, "bold"),
                                bg="white")
         title_label.pack(pady=(5, 10))
         
@@ -694,7 +720,7 @@ class ComparisonFrame:
             
             # Nazwa maski (Gx, Gy)
             name_label = tk.Label(mask_frame, text=mask_name, 
-                                 font=("TkDefaultFont", int(9 * max(1.0, scale_factor * 0.8)), "bold"),
+                                 font=("TkDefaultFont", 9, "bold"),
                                  bg="white")
             name_label.pack()
             
@@ -736,7 +762,7 @@ class ComparisonFrame:
                     # Dodaj tekst z wartością
                     canvas.create_text((x1 + x2) / 2, (y1 + y2) / 2, 
                                      text=str(int(val)) if val == int(val) else f"{val:.1f}",
-                                     font=("TkDefaultFont", int(11 * max(1.0, scale_factor * 0.8)), "bold"),
+                                     font=("TkDefaultFont", 8, "bold"),
                                      fill=text_color)
         
         # Pozycja tooltip
@@ -786,6 +812,9 @@ def add_comparison():
     try:
         frame.color_space_combo.set(global_color_space_var.get())
         frame.method_combo.set(global_method_var.get())
+        frame.low_threshold.set(global_low_threshold_var.get())
+        frame.high_threshold.set(global_high_threshold_var.get())
+        frame.binary_var.set(global_binary_var.get())
     except Exception:
         pass
     update_scroll_region()
@@ -826,6 +855,7 @@ def switch_language(lang):
     add_btn.config(text=get_text('ADD_FRAME'))
     choose_img_btn.config(text=get_text('CHOOSE_IMAGE'))
     run_all_btn.config(text=get_text('RUN_FUNCTION'))
+    global_options_label.config(text=get_text('GLOBAL_OPTIONS'))
     lang_label.config(text=get_text('LANGUAGE'))
 
     # Aktualizacja Comboboxa języków
@@ -850,21 +880,28 @@ def switch_language(lang):
     try:
         global_color_label.config(text=get_text('GLOBAL_COLOR_SPACE'))
         global_method_label.config(text=get_text('GLOBAL_METHOD'))
+        global_threshold_label.config(text=get_text('GLOBAL_THRESHOLD'))
+        global_binary_label.config(text=get_text('GLOBAL_BINARY'))
+        global_low_threshold_label.config(text=get_text('LOW_THRESHOLD'))
+        global_high_threshold_label.config(text=get_text('HIGH_THRESHOLD'))
         apply_color_btn.config(text=get_text('APPLY_COLOR_ALL'))
         apply_method_btn.config(text=get_text('APPLY_METHOD_ALL'))
+        apply_threshold_btn.config(text=get_text('APPLY_THRESHOLD_ALL'))
+        apply_binary_btn.config(text=get_text('APPLY_BINARY_ALL'))
+        global_binary_check.config(text=get_text('BINARYZATION'))
     except Exception:
         pass
 
 
 # ===== Główne przyciski (Zmienione, aby umożliwić aktualizację tekstu) =====
-main_pady = int(10 * max(1.0, scale_factor * 0.7))
+main_pady = int(10 * scale_factor)
 main_controls = tk.Frame(root, pady=main_pady)
 main_controls.pack(fill="x")
 
 # przyciski zarządzania ramkami
-btn_width = int(3 * max(1.0, scale_factor * 0.7))
+btn_width = int(3 * scale_factor)
 add_btn = tk.Button(main_controls, text=get_text('ADD_FRAME'), command=add_comparison, width=btn_width)
-add_btn.pack(side="left", padx=int(5 * max(1.0, scale_factor * 0.7)))
+add_btn.pack(side="left", padx=int(5 * scale_factor))
 
 # przycisk wyboru obrazu
 def choose_shared_image():
@@ -893,7 +930,7 @@ def choose_shared_image():
 
 
 choose_img_btn = tk.Button(main_controls, text=get_text('CHOOSE_IMAGE'), command=choose_shared_image) # Zmiana
-choose_img_btn.pack(side="left", padx=int(10 * max(1.0, scale_factor * 0.7)))
+choose_img_btn.pack(side="left", padx=int(10 * scale_factor))
 
 # przycisk uruchom funkcję
 def run_all():
@@ -905,22 +942,40 @@ def run_all():
 
 
 run_all_btn = tk.Button(main_controls, text=get_text('RUN_FUNCTION'), command=run_all, bg="#4CAF50", fg="white") # Zmiana
-run_all_btn.pack(side="left", padx=int(10 * max(1.0, scale_factor * 0.7)))
+run_all_btn.pack(side="left", padx=int(10 * scale_factor))
 
 image_status_label = tk.Label(main_controls, text=get_text('IMAGE_NOT_LOADED'), fg="gray") # Zmiana
-image_status_label.pack(side="left", padx=int(10 * max(1.0, scale_factor * 0.7)))
+image_status_label.pack(side="left", padx=int(10 * scale_factor))
 
+# Przycisk rozwijania/zwijania opcji globalnych
+global_options_visible = tk.BooleanVar(value=True)
+
+def toggle_global_options():
+    if global_options_visible.get():
+        global_options_frame.pack_forget()
+        toggle_global_btn.config(text="▼")
+        global_options_visible.set(False)
+    else:
+        global_options_frame.pack(fill="x", pady=int(5 * scale_factor), padx=int(10 * scale_factor), before=scroll_container)
+        toggle_global_btn.config(text="▲")
+        global_options_visible.set(True)
+
+toggle_global_btn = tk.Button(main_controls, text="▲", width=3, command=toggle_global_options)
+toggle_global_btn.pack(side="left", padx=int(10 * scale_factor))
+
+global_options_label = tk.Label(main_controls, text=get_text('GLOBAL_OPTIONS'))
+global_options_label.pack(side="left", padx=int(5 * scale_factor))
 
 # Przełącznik języka (Dodany ponownie)
 lang_frame = tk.Frame(main_controls)
-lang_frame.pack(side="right", padx=int(10 * max(1.0, scale_factor * 0.7)))
+lang_frame.pack(side="right", padx=int(10 * scale_factor))
 
 lang_label = tk.Label(lang_frame, text=get_text('LANGUAGE'))
 lang_label.pack(side="left")
 
 lang_var = tk.StringVar(value=get_text('LANG_PL'))
 
-lang_combo_width = int(15 * max(1.0, scale_factor * 0.6))
+lang_combo_width = int(15 * scale_factor)
 lang_combo = ttk.Combobox(
     lang_frame,
     textvariable=lang_var,
@@ -941,48 +996,12 @@ lang_combo.bind('<<ComboboxSelected>>', language_changed)
 
 
 # ===== Globalne / domyślne ustawienia dla nowych kontenerów =====
-global_defaults_container = tk.Frame(root, pady=int(8 * max(1.0, scale_factor * 0.7)))
-global_defaults_container.pack(fill="x")
+# Kontener na wszystkie opcje globalne (można schować)
+global_options_frame = tk.Frame(root, pady=int(8 * scale_factor), padx=int(10 * scale_factor), bd=2, relief="groove", bg="#f0f0f0")
+global_options_frame.pack(fill="x", pady=int(5 * scale_factor), padx=int(10 * scale_factor))
 
-# Górny rząd: etykiety + comboboxy
-globals_top = tk.Frame(global_defaults_container)
-globals_top.pack(fill="x")
-
-g_combo_width = int(10 * max(1.0, scale_factor * 0.6))
-g_method_combo_width = int(25 * max(1.0, scale_factor * 0.6))
-
-global_color_label = tk.Label(globals_top, text=get_text('GLOBAL_COLOR_SPACE'))
-global_color_label.pack(side="left", padx=int(8 * max(1.0, scale_factor * 0.7)))
-
-global_color_space_var = tk.StringVar(value='RGB')
-global_color_combo = ttk.Combobox(globals_top, state="readonly", width=g_combo_width,
-                                  textvariable=global_color_space_var)
-global_color_combo['values'] = ['RGB', 'HSV', 'LAB', 'CMYK']
-global_color_combo.pack(side="left", padx=int(5 * max(1.0, scale_factor * 0.7)))
-
-global_method_label = tk.Label(globals_top, text=get_text('GLOBAL_METHOD'))
-global_method_label.pack(side="left", padx=int(15 * max(1.0, scale_factor * 0.7)))
-
-global_method_var = tk.StringVar(value='Sobel')
-global_method_combo = ttk.Combobox(globals_top, state="readonly", width=g_method_combo_width,
-                                   textvariable=global_method_var)
-global_method_combo['values'] = [
-    'Sobel',
-    'Sobel CV2',
-    'Laplacian 4-neighbor',
-    'Laplacian 8-neighbor',
-    'Laplacian LoG',
-    'Scharr',
-    'Prewitt',
-    'Canny',
-    'Canny CV2',
-    'Roberts'
-]
-global_method_combo.pack(side="left", padx=int(5 * max(1.0, scale_factor * 0.7)))
-
-# Dolny rząd: przyciski Zastosuj do wszystkich
-globals_buttons = tk.Frame(global_defaults_container)
-globals_buttons.pack(fill="x", pady=int(5 * max(1.0, scale_factor * 0.7)))
+g_combo_width = int(10 * scale_factor)
+g_method_combo_width = int(25 * scale_factor)
 
 def apply_global_color_to_all():
     val = global_color_space_var.get()
@@ -1000,11 +1019,105 @@ def apply_global_method_to_all():
         except Exception:
             pass
 
-apply_color_btn = tk.Button(globals_buttons, text=get_text('APPLY_COLOR_ALL'), command=apply_global_color_to_all)
-apply_color_btn.pack(side="left", padx=int(8 * max(1.0, scale_factor * 0.7)))
+# Pierwszy rząd: przestrzeń barw
+color_space_row = tk.Frame(global_options_frame)
+color_space_row.pack(fill="x", pady=int(3 * scale_factor))
 
-apply_method_btn = tk.Button(globals_buttons, text=get_text('APPLY_METHOD_ALL'), command=apply_global_method_to_all)
-apply_method_btn.pack(side="left", padx=int(8 * max(1.0, scale_factor * 0.7)))
+global_color_label = tk.Label(color_space_row, text=get_text('GLOBAL_COLOR_SPACE'))
+global_color_label.pack(side="left", padx=int(8 * scale_factor))
+
+global_color_space_var = tk.StringVar(value='RGB')
+global_color_combo = ttk.Combobox(color_space_row, state="readonly", width=g_combo_width,
+                                  textvariable=global_color_space_var)
+global_color_combo['values'] = ['RGB', 'HSV', 'LAB', 'CMYK']
+global_color_combo.pack(side="left", padx=int(5 * scale_factor))
+
+apply_color_btn = tk.Button(color_space_row, text=get_text('APPLY_COLOR_ALL'), command=apply_global_color_to_all)
+apply_color_btn.pack(side="left", padx=int(8 * scale_factor))
+
+# Drugi rząd: metoda
+method_row = tk.Frame(global_options_frame)
+method_row.pack(fill="x", pady=int(3 * scale_factor))
+
+global_method_label = tk.Label(method_row, text=get_text('GLOBAL_METHOD'))
+global_method_label.pack(side="left", padx=int(8 * scale_factor))
+
+global_method_var = tk.StringVar(value='Sobel')
+global_method_combo = ttk.Combobox(method_row, state="readonly", width=g_method_combo_width,
+                                   textvariable=global_method_var)
+global_method_combo['values'] = [
+    'Sobel',
+    'Sobel CV2',
+    'Laplacian 4-neighbor',
+    'Laplacian 8-neighbor',
+    'Laplacian LoG',
+    'Scharr',
+    'Prewitt',
+    'Canny',
+    'Canny CV2',
+    'Roberts'
+]
+global_method_combo.pack(side="left", padx=int(5 * scale_factor))
+
+apply_method_btn = tk.Button(method_row, text=get_text('APPLY_METHOD_ALL'), command=apply_global_method_to_all)
+apply_method_btn.pack(side="left", padx=int(8 * scale_factor))
+
+# Trzeci rząd: próg (threshold)
+threshold_row = tk.Frame(global_options_frame)
+threshold_row.pack(fill="x", pady=int(3 * scale_factor))
+
+global_threshold_label = tk.Label(threshold_row, text=get_text('GLOBAL_THRESHOLD'))
+global_threshold_label.pack(side="left", padx=int(8 * scale_factor))
+
+spinbox_width = int(5 * scale_factor)
+padx_small = int(3 * scale_factor)
+
+global_low_threshold_label = tk.Label(threshold_row, text=get_text('LOW_THRESHOLD'))
+global_low_threshold_label.pack(side="left", padx=padx_small)
+global_low_threshold_var = tk.IntVar(value=0)
+global_low_spin = tk.Spinbox(threshold_row, from_=0, to=255, width=spinbox_width, textvariable=global_low_threshold_var)
+global_low_spin.pack(side="left", padx=padx_small)
+
+global_high_threshold_label = tk.Label(threshold_row, text=get_text('HIGH_THRESHOLD'))
+global_high_threshold_label.pack(side="left", padx=padx_small)
+global_high_threshold_var = tk.IntVar(value=255)
+global_high_spin = tk.Spinbox(threshold_row, from_=1, to=255, width=spinbox_width, textvariable=global_high_threshold_var)
+global_high_spin.pack(side="left", padx=padx_small)
+
+def apply_global_threshold_to_all():
+    low_val = global_low_threshold_var.get()
+    high_val = global_high_threshold_var.get()
+    for frame in comparison_frames:
+        try:
+            frame.low_threshold.set(low_val)
+            frame.high_threshold.set(high_val)
+        except Exception:
+            pass
+
+apply_threshold_btn = tk.Button(threshold_row, text=get_text('APPLY_THRESHOLD_ALL'), command=apply_global_threshold_to_all)
+apply_threshold_btn.pack(side="left", padx=int(8 * scale_factor))
+
+# Czwarty rząd: binaryzacja
+binary_row = tk.Frame(global_options_frame)
+binary_row.pack(fill="x", pady=int(3 * scale_factor))
+
+global_binary_label = tk.Label(binary_row, text=get_text('GLOBAL_BINARY'))
+global_binary_label.pack(side="left", padx=int(8 * scale_factor))
+
+global_binary_var = tk.BooleanVar(value=False)
+global_binary_check = tk.Checkbutton(binary_row, text=get_text('BINARYZATION'), variable=global_binary_var)
+global_binary_check.pack(side="left", padx=int(5 * scale_factor))
+
+def apply_global_binary_to_all():
+    val = global_binary_var.get()
+    for frame in comparison_frames:
+        try:
+            frame.binary_var.set(val)
+        except Exception:
+            pass
+
+apply_binary_btn = tk.Button(binary_row, text=get_text('APPLY_BINARY_ALL'), command=apply_global_binary_to_all)
+apply_binary_btn.pack(side="left", padx=int(8 * scale_factor))
 
 # Podpowiedź: nowe ramki będą używać wybranych ustawień jako domyślne
 
